@@ -143,6 +143,7 @@ services:
       - PORT=5004
       - DB_HOST=postgres_order
       - DB_PORT=5432
+      - DB_NAME=order_db
       - CATALOG_GRPC_URL=catalog_service:50051
       - CART_GRPC_URL=cart_service:50052
       - COMM_MODE=grpc

@@ -7,7 +7,6 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'postgres',
   password: process.env.DB_PASS || 'postgres',
   port: process.env.DB_PORT || 5432,
-  ssl: { rejectUnauthorized: false },
 });
 
 export const initDB = async () => {
