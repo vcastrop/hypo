@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: app
+  name: wishlist-service
+spec:
+  type: ClusterIP # no accesible desde internet
+  selector:
+    app: wishlist-service
+  ports:
+    - port: 5006
+      targetPort: 5006
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: app
+  name: wishlist-deployment
+spec:
+  selector:
+    matchLabels:
+      app: wishlist-service
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: wishlist-service
+    spec:
+      containers:
+      - name: wishlist-service
+        image: rontxz/wishlist:latest
+        ports:
+        - containerPort: 5006
+        env:
+        - name: PORT
+          value: "5006"
+        - name: DB_USER
+          value: "postgres"
+        - name: DB_PASS
+          value: "postgres"
+        - name: DB_HOST
+          value: "tu-rds-endpoint.aws.com" # Cambiar por el endpoint real de AWS RDS
+        - name: DB_PORT
+          value: "5432"

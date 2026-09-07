@@ -1,0 +1,193 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: models_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=user_db
+    ports:
+      - "5432:5432"
+    networks:
+      - back-tier
+
+  postgres_order:
+    image: postgres:15-alpine
+    container_name: models_postgres_order
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=order_db
+    ports:
+      - "5433:5432"
+    networks:
+      - back-tier
+
+  mongodb:
+    image: mongo:7
+    container_name: models_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      - back-tier
+
+  redis:
+    image: redis:7-alpine
+    container_name: models_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - back-tier
+
+  frontend:
+    build: ./frontend
+    container_name: models_frontend
+    ports:
+      - 3000:80
+    restart: always
+    env_file:
+      - "frontend.env"
+    networks:
+      - front-tier
+      - back-tier
+
+  api_gateway:
+    build: ./api-gateway
+    container_name: models_api_gateway
+    ports:
+      - 80:80
+    networks:
+      - front-tier
+      - back-tier
+    depends_on:
+      - catalog_service
+      - user_service
+      - cart_service
+      - order_service
+      - review_service
+      - wishlist_service
+
+  catalog_service:
+    build: ./microservices/catalog-service
+    container_name: models_catalog_service
+    ports:
+      - 5001:5001
+      - 50051:50051
+    restart: always
+    env_file:
+      - "backend.env"
+    environment:
+      - PORT=5001
+      - GRPC_PORT=50051
+      - MONGO_URI=mongodb://mongodb:27017/catalog_db
+    volumes:
+      - ./microservices/proto:/usr/src/proto
+    networks:
+      - back-tier
+    depends_on:
+      - mongodb
+
+  user_service:
+    build: ./microservices/user-service
+    container_name: models_user_service
+    ports:
+      - 5002:5002
+    restart: always
+    env_file:
+      - "backend.env"
+    environment:
+      - PORT=5002
+    networks:
+      - back-tier
+    depends_on:
+      - postgres
+
+  cart_service:
+    build: ./microservices/cart-service
+    container_name: models_cart_service
+    ports:
+      - 5003:5003
+      - 50052:50052
+    restart: always
+    env_file:
+      - "backend.env"
+    environment:
+      - PORT=5003
+      - GRPC_PORT=50052
+      - CATALOG_URL=http://catalog_service:5001
+      - CATALOG_GRPC_URL=catalog_service:50051
+      - COMM_MODE=grpc
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./microservices/proto:/proto
+    networks:
+      - back-tier
+    depends_on:
+      - redis
+      - catalog_service
+
+  order_service:
+    build: ./microservices/order-service
+    container_name: models_order_service
+    ports:
+      - 5004:5004
+    restart: always
+    env_file:
+      - "backend.env"
+    environment:
+      - PORT=5004
+      - DB_HOST=postgres_order
+      - DB_PORT=5432
+      - CATALOG_GRPC_URL=catalog_service:50051
+      - CART_GRPC_URL=cart_service:50052
+      - COMM_MODE=grpc
+    volumes:
+      - ./microservices/proto:/proto
+    networks:
+      - back-tier
+    depends_on:
+      - postgres_order
+      - catalog_service
+      - cart_service
+
+  review_service:
+    build: ./microservices/review-service
+    container_name: models_review_service
+    ports:
+      - 5005:5005
+    restart: always
+    env_file:
+      - "backend.env"
+    environment:
+      - PORT=5005
+      - MONGO_URI=mongodb://mongodb:27017/review_db
+    networks:
+      - back-tier
+    depends_on:
+      - mongodb
+
+  wishlist_service:
+    build: ./microservices/wishlist-service
+    container_name: models_wishlist_service
+    ports:
+      - 5006:5006
+    restart: always
+    env_file:
+      - "backend.env"
+    environment:
+      - PORT=5006
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - back-tier
+    depends_on:
+      - redis
+
+networks:
+  front-tier:
+  back-tier:

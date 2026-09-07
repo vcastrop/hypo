@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  backend:
+    container_name: bookstore-backend
+    build: .
+    restart: always
+    ports:
+      - 5001:5001
+    env_file:
+      - ".env"
