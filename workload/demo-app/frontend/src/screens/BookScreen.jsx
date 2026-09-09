@@ -37,7 +37,7 @@ const BookScreen = () => {
   const fetchReviews = async () => {
     try {
       const { data } = await api.get(`/api/reviews/${id}`);
-      setReviews(data || []);
+      setReviews(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading reviews:', error);
     }
@@ -117,7 +117,7 @@ const BookScreen = () => {
     return <h2 className="text-center my-5">Cargando libro...</h2>;
   }
 
-  if (!book || !book.id) {
+  if (!book || !(book.id || book._id)) {
     return (
       <div className="text-center my-5">
         <h2>Libro no encontrado</h2>
@@ -205,11 +205,13 @@ const BookScreen = () => {
           ) : (
             <ListGroup variant="flush">
               {reviews.map((review) => (
-                <ListGroup.Item key={review.id} className="mb-2">
+                <ListGroup.Item key={review.id || review._id} className="mb-2">
                   <div className="d-flex justify-content-between">
-                    <strong>{review.userName}</strong>
+                    <strong>{review.userName || review.user_name}</strong>
                     <small className="text-muted">
-                      {review.date ? new Date(review.date).toLocaleDateString('es-MX') : ''}
+                      {(review.date || review.created_at)
+                        ? new Date(review.date || review.created_at).toLocaleDateString('es-MX')
+                        : ''}
                     </small>
                   </div>
                   <div className="my-1">{renderStars(review.rating)}</div>

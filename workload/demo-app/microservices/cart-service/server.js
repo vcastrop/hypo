@@ -15,11 +15,20 @@ app.use(express.json());
 
 const cartKey = (userId) => `cart:${userId}`;
 
+app.get('/health', async (req, res) => {
+  try {
+    await redis.ping();
+    res.json({ status: 'Ok', service: 'cart-service' });
+  } catch (err) {
+    res.status(503).json({ status: 'Unavailable', service: 'cart-service' });
+  }
+});
+
 app.get('/api/cart/:userId', async (req, res) => {
   try {
     const data = await redis.hgetall(cartKey(req.params.userId));
     const items = Object.entries(data || {}).map(([book_id, quantity]) => ({
-      book_id, quantity: parseInt(quantity),
+      book_id, quantity: parseInt(quantity, 10),
     }));
     res.json({ userId: req.params.userId, items });
   } catch (err) {
@@ -39,13 +48,14 @@ app.post('/api/cart/:userId', async (req, res) => {
       const response = await fetch(`${catalogUrl}/api/books/${book_id}`);
       if (!response.ok) return res.status(404).json({ message: 'Book not found in catalog' });
     }
-    await redis.hincrby(cartKey(userId), book_id, quantity);
+    await redis.hincrby(cartKey(userId), book_id, Number(quantity) || 1);
     const data = await redis.hgetall(cartKey(userId));
-    const cart = Object.entries(data).map(([book_id, qty]) => ({
-      book_id, quantity: parseInt(qty),
+    const cart = Object.entries(data).map(([id, qty]) => ({
+      book_id: id, quantity: parseInt(qty, 10),
     }));
     res.json({ message: 'Added to cart', cart });
   } catch (err) {
+    console.error('Error updating cart:', err);
     res.status(500).json({ message: 'Error updating cart' });
   }
 });
@@ -55,8 +65,8 @@ app.delete('/api/cart/:userId/:bookId', async (req, res) => {
   try {
     await redis.hdel(cartKey(userId), bookId);
     const data = await redis.hgetall(cartKey(userId));
-    const cart = Object.entries(data || {}).map(([book_id, qty]) => ({
-      book_id, quantity: parseInt(qty),
+    const cart = Object.entries(data || {}).map(([id, qty]) => ({
+      book_id: id, quantity: parseInt(qty, 10),
     }));
     res.json({ message: 'Removed from cart', cart });
   } catch (err) {
@@ -65,7 +75,7 @@ app.delete('/api/cart/:userId/:bookId', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5003;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Cart service (REST) running on port ${PORT}`);
   startGrpcServer();
 });

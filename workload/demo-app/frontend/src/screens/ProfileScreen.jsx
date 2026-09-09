@@ -13,6 +13,7 @@ const ProfileScreen = () => {
     );
   }
 
+  const address = user.address || {};
   const profile = {
     firstName: user.firstName,
     lastName: user.lastName,
@@ -20,11 +21,11 @@ const ProfileScreen = () => {
     email: user.email,
     phone: user.phone,
     image: user.image,
-    address: user.address.address,
-    city: user.address.city,
-    state: user.address.state,
-    postalCode: user.address.postalCode,
-    country: user.address.country
+    address: address.address,
+    city: address.city,
+    state: address.state,
+    postalCode: address.postalCode,
+    country: address.country
   };
 
 

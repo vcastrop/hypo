@@ -1,5 +1,5 @@
 import { createContext, useState } from "react";
-import axios from "axios";
+import { api } from "../lib/api";
 
 export const AuthContext = createContext();
 
@@ -8,24 +8,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      const { data } = await axios.post("https://dummyjson.com/auth/login", {
+      const { data } = await api.post("/api/users/login", {
         username,
         password,
       });
-
-      console.log("Usuario autenticado:", data);
-
-      const userId = data.id;
-      const fullUserRes = await axios.get(
-        `https://dummyjson.com/users/${userId}`
-      );
-
-      const fullUser = fullUserRes.data;
-      setUser({
-        ...fullUser,
-        token: data.token,
-      });      
-
+      setUser(data);
     } catch (err) {
       throw new Error(err.response?.data?.message || "Credenciales inválidas");
     }

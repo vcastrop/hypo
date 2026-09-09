@@ -12,7 +12,7 @@ const HomeScreen = () => {
     const fetchBooks = async () => {
       try {
         const { data } = await api.get('/api/books/');
-        setBooks(data);
+        setBooks(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error loading books:", error);
       }

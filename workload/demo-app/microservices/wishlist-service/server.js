@@ -8,6 +8,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/health', async (req, res) => {
+  try {
+    await redis.ping();
+    res.json({ status: 'Ok', service: 'wishlist-service' });
+  } catch (err) {
+    res.status(503).json({ status: 'Unavailable', service: 'wishlist-service' });
+  }
+});
+
 const wishKey = (userId) => `wishlist:${userId}`;
 
 app.get('/api/wishlists/:userId', async (req, res) => {
@@ -56,4 +65,4 @@ app.delete('/api/wishlists/:userId/:bookId', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5006;
-app.listen(PORT, () => console.log(`Wishlist service running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Wishlist service running on port ${PORT}`));

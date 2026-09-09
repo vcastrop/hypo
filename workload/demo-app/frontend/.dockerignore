@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-docker-debug
+dist-docker-debug2
+*.local
+.env.*
+!.env.example

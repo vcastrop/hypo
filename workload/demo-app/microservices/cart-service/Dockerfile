@@ -6,4 +6,5 @@ RUN npm install
 COPY . .
 RUN mkdir -p /proto && cp /app/catalog.proto /proto/ && cp /app/cart.proto /proto/
 EXPOSE 5003
+EXPOSE 50052
 CMD ["npm", "start"]

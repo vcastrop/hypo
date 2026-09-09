@@ -4,11 +4,16 @@ services:
     container_name: models_postgres
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=user_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: user_db
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks:
       - back-tier
 
@@ -17,11 +22,16 @@ services:
     container_name: models_postgres_order
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: order_db
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks:
       - back-tier
 
@@ -31,6 +41,11 @@ services:
     restart: always
     ports:
       - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks:
       - back-tier
 
@@ -40,154 +55,241 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks:
       - back-tier
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: "/"
     container_name: models_frontend
     ports:
-      - 3000:80
+      - "3000:80"
     restart: always
+    environment:
+      NGINX_PORT: "80"
+      PROXY_PASS: http://api_gateway:80
     env_file:
-      - "frontend.env"
-    networks:
-      - front-tier
-      - back-tier
-
-  api_gateway:
-    build: ./api-gateway
-    container_name: models_api_gateway
-    ports:
-      - 80:80
+      - path: frontend.env
+        required: false
     networks:
       - front-tier
       - back-tier
     depends_on:
-      - catalog_service
-      - user_service
-      - cart_service
-      - order_service
-      - review_service
-      - wishlist_service
+      api_gateway:
+        condition: service_healthy
+
+  api_gateway:
+    build: ./api-gateway
+    container_name: models_api_gateway
+    restart: always
+    ports:
+      - "8080:80"
+    networks:
+      - front-tier
+      - back-tier
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      catalog_service:
+        condition: service_healthy
+      user_service:
+        condition: service_healthy
+      cart_service:
+        condition: service_healthy
+      order_service:
+        condition: service_healthy
+      review_service:
+        condition: service_healthy
+      wishlist_service:
+        condition: service_healthy
 
   catalog_service:
     build: ./microservices/catalog-service
     container_name: models_catalog_service
     ports:
-      - 5001:5001
-      - 50051:50051
+      - "5001:5001"
+      - "50051:50051"
     restart: always
     env_file:
-      - "backend.env"
+      - path: backend.env
+        required: false
     environment:
-      - PORT=5001
-      - GRPC_PORT=50051
-      - MONGO_URI=mongodb://mongodb:27017/catalog_db
+      PORT: "5001"
+      GRPC_PORT: "50051"
+      MONGO_URI: mongodb://mongodb:27017/catalog_db
     volumes:
       - ./microservices/proto:/usr/src/proto
     networks:
       - back-tier
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "const net=require('net'); const s=net.createConnection({host:'127.0.0.1',port:50051}); const fail=()=>process.exit(1); s.setTimeout(1000,fail); s.on('connect',()=>{s.end();process.exit(0)}); s.on('error',fail)" &&
+          node -e "fetch('http://127.0.0.1:5001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
 
   user_service:
     build: ./microservices/user-service
     container_name: models_user_service
     ports:
-      - 5002:5002
+      - "5002:5002"
     restart: always
     env_file:
-      - "backend.env"
+      - path: backend.env
+        required: false
     environment:
-      - PORT=5002
+      PORT: "5002"
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: user_db
     networks:
       - back-tier
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   cart_service:
     build: ./microservices/cart-service
     container_name: models_cart_service
     ports:
-      - 5003:5003
-      - 50052:50052
+      - "5003:5003"
+      - "50052:50052"
     restart: always
     env_file:
-      - "backend.env"
+      - path: backend.env
+        required: false
     environment:
-      - PORT=5003
-      - GRPC_PORT=50052
-      - CATALOG_URL=http://catalog_service:5001
-      - CATALOG_GRPC_URL=catalog_service:50051
-      - COMM_MODE=grpc
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      PORT: "5003"
+      GRPC_PORT: "50052"
+      CATALOG_URL: http://catalog_service:5001
+      CATALOG_GRPC_URL: catalog_service:50051
+      COMM_MODE: grpc
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     volumes:
       - ./microservices/proto:/proto
     networks:
       - back-tier
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "const net=require('net'); const s=net.createConnection({host:'127.0.0.1',port:50052}); const fail=()=>process.exit(1); s.setTimeout(1000,fail); s.on('connect',()=>{s.end();process.exit(0)}); s.on('error',fail)" &&
+          node -e "fetch('http://127.0.0.1:5003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - redis
-      - catalog_service
+      redis:
+        condition: service_healthy
+      catalog_service:
+        condition: service_healthy
 
   order_service:
     build: ./microservices/order-service
     container_name: models_order_service
     ports:
-      - 5004:5004
+      - "5004:5004"
     restart: always
     env_file:
-      - "backend.env"
+      - path: backend.env
+        required: false
     environment:
-      - PORT=5004
-      - DB_HOST=postgres_order
-      - DB_PORT=5432
-      - DB_NAME=order_db
-      - CATALOG_GRPC_URL=catalog_service:50051
-      - CART_GRPC_URL=cart_service:50052
-      - COMM_MODE=grpc
+      PORT: "5004"
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_HOST: postgres_order
+      DB_PORT: "5432"
+      DB_NAME: order_db
+      CATALOG_GRPC_URL: catalog_service:50051
+      CART_GRPC_URL: cart_service:50052
+      COMM_MODE: grpc
     volumes:
       - ./microservices/proto:/proto
     networks:
       - back-tier
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - postgres_order
-      - catalog_service
-      - cart_service
+      postgres_order:
+        condition: service_healthy
+      catalog_service:
+        condition: service_healthy
+      cart_service:
+        condition: service_healthy
 
   review_service:
     build: ./microservices/review-service
     container_name: models_review_service
     ports:
-      - 5005:5005
+      - "5005:5005"
     restart: always
     env_file:
-      - "backend.env"
+      - path: backend.env
+        required: false
     environment:
-      - PORT=5005
-      - MONGO_URI=mongodb://mongodb:27017/review_db
+      PORT: "5005"
+      MONGO_URI: mongodb://mongodb:27017/review_db
     networks:
       - back-tier
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
 
   wishlist_service:
     build: ./microservices/wishlist-service
     container_name: models_wishlist_service
     ports:
-      - 5006:5006
+      - "5006:5006"
     restart: always
     env_file:
-      - "backend.env"
+      - path: backend.env
+        required: false
     environment:
-      - PORT=5006
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      PORT: "5006"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     networks:
       - back-tier
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5006/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
 networks:
   front-tier:

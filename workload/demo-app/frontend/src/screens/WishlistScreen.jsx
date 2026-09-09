@@ -17,7 +17,7 @@ const WishlistScreen = () => {
   const fetchWishlist = async () => {
     try {
       const { data } = await api.get(`/api/wishlists/${user.id}`);
-      setWishlist(data);
+      setWishlist(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading wishlist:', error);
     } finally {

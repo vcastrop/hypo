@@ -52,7 +52,7 @@ const Login = () => {
 
               />
               <Form.Text className="text-muted">
-                Nunca compartiremos tu correo con nadie más.
+                Usuario de demo local: emilys / emilyspass
               </Form.Text>
             </Form.Group>
 

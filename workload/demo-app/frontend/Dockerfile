@@ -10,8 +10,11 @@ RUN npm ci
 
 COPY . .
 
-# Build the frontEnd
-RUN npm run build
+# Bake the API URL into the bundle. Ignore the checked-in production file so
+# local Docker builds cannot accidentally target the AWS load balancer.
+ARG VITE_API_URL=
+ENV VITE_API_URL=$VITE_API_URL
+RUN rm -f .env.production && VITE_API_URL="$VITE_API_URL" npm run build
 
 FROM nginx:1.25-alpine AS development
 

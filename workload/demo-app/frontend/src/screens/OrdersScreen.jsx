@@ -14,7 +14,7 @@ const OrdersScreen = () => {
     const fetchOrders = async () => {
       try {
         const { data } = await api.get(`/api/orders/${user.id}`);
-        setOrders(data);
+        setOrders(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error loading orders:', error);
       } finally {
@@ -65,7 +65,7 @@ const OrdersScreen = () => {
               <span>
                 <strong>Orden #{order.id}</strong>
                 {' — '}
-                {new Date(order.date).toLocaleDateString('es-MX', {
+                {new Date(order.date || order.created_at).toLocaleDateString('es-MX', {
                   year: 'numeric', month: 'long', day: 'numeric',
                   hour: '2-digit', minute: '2-digit'
                 })}
@@ -74,7 +74,7 @@ const OrdersScreen = () => {
             </Card.Header>
             <Card.Body>
               <ListGroup variant="flush">
-                {order.items.map((item, idx) => (
+                {(order.items || []).map((item, idx) => (
                   <ListGroup.Item key={idx}>
                     <Row>
                       <Col md={6}>{item.name || `Book ${item.book_id}`}</Col>
