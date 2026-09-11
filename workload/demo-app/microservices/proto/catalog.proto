@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package catalog;
+
+service CatalogService {
+  rpc GetBook (BookRequest) returns (BookReply);
+}
+
+message BookRequest {
+  string id = 1;
+}
+
+message BookReply {
+  string id = 1;
+  string name = 2;
+  string author = 3;
+  string description = 4;
+  string price = 5;
+  int32 countInStock = 6;
+  string image = 7;
+  bool found = 8;
+}

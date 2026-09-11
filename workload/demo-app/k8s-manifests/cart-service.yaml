@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: app
+  name: cart-service
+spec:
+  type: ClusterIP
+  selector:
+    app: cart-service
+  ports:
+    - port: 5003
+      targetPort: 5003
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: app
+  name: cart-deployment
+spec:
+  selector:
+    matchLabels:
+      app: cart-service
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cart-service
+    spec:
+      containers:
+      - name: cart-service
+        image: rontxz/cart:latest
+        ports:
+        - containerPort: 5003
+        env:
+        - name: PORT
+          value: "5003"
+        - name: CATALOG_URL
+          value: "http://catalog-service:5001"
+        - name: DB_USER
+          value: "postgres"
+        - name: DB_PASS
+          value: "postgres"
+        - name: DB_HOST
+          value: "postgres-order"
+        - name: DB_PORT
+          value: "5432"
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"

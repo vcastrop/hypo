@@ -1,0 +1,1 @@
+export const BOOK_TABLE = process.env.BOOK_TABLE || "tb_books";

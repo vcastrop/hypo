@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: app
+  name: user-service
+spec:
+  type: ClusterIP #no accesible desde internet
+  selector:
+    app: user-service
+  ports:
+    - port: 5002
+      targetPort: 5002
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: app
+  name: user-deployment
+spec:
+  selector:
+    matchLabels:
+      app: user-service
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: rontxz/user:latest
+        ports:
+        - containerPort: 5002
+        env:
+        - name: PORT
+          value: "5002"
+        - name: DB_USER
+          value: "postgres"
+        - name: DB_PASS
+          value: "postgres"
+        - name: DB_HOST
+          value: "postgres-user" # Cambiar por el endpoint real de AWS RDS
+        - name: DB_PORT
+          value: "5432"
