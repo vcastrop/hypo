@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: review-service
+  namespace: mybookstore
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: review-service
+  template:
+    metadata:
+      labels:
+        app: review-service
+    spec:
+      containers:
+        - name: review-service
+          image: mybookstore/review-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5005
+          env:
+            - name: PORT
+              value: "5005"
+            - name: MONGO_URI
+              value: mongodb://mongodb:27017/review_db
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5005
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5005
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: review-service
+  namespace: mybookstore
+spec:
+  selector:
+    app: review-service
+  ports:
+    - port: 5005
+      targetPort: 5005

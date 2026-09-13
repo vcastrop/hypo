@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: mybookstore
+data:
+  nginx.conf: |
+    events {}
+
+    http {
+      server {
+        listen 80;
+
+        location = /health {
+          access_log off;
+          return 200 "ok";
+          add_header Content-Type text/plain;
+        }
+
+        location /api/books {
+          proxy_pass http://catalog-service:5001;
+        }
+
+        location /api/users {
+          proxy_pass http://user-service:5002;
+        }
+
+        location /api/cart {
+          proxy_pass http://cart-service:5003;
+        }
+
+        location /api/orders {
+          proxy_pass http://order-service:5004;
+        }
+
+        location /api/reviews {
+          proxy_pass http://review-service:5005;
+        }
+
+        location /api/wishlists {
+          proxy_pass http://wishlist-service:5006;
+        }
+      }
+    }
