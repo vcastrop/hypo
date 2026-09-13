@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: mybookstore
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+        - name: catalog-service
+          image: mybookstore/catalog-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5001
+              name: http
+            - containerPort: 50051
+              name: grpc
+          env:
+            - name: PORT
+              value: "5001"
+            - name: GRPC_PORT
+              value: "50051"
+            - name: MONGO_URI
+              value: mongodb://mongodb:27017/catalog_db
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: mybookstore
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - name: http
+      port: 5001
+      targetPort: 5001
+    - name: grpc
+      port: 50051
+      targetPort: 50051
