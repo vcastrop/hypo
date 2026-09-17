@@ -14,6 +14,8 @@ app.use(express.json());
 
 const register = new client.Registry();
 
+client.collectDefaultMetrics({ register });
+
 const httpRequestsTotal = new client.Counter({
   name: 'http_requests_total',
   help: 'How many HTTP requests the service has received',
