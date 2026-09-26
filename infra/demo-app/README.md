@@ -57,6 +57,14 @@ kubectl apply -f infra/demo-app/api-gateway.yaml
 kubectl apply -f infra/demo-app/frontend.yaml
 ```
 
+## Deploy the observability stack (Prometheus + Grafana)
+
+```bash
+kubectl apply -f infra/demo-app/prometheus.yaml
+kubectl apply -f infra/demo-app/grafana-dashboard-configmap.yaml
+kubectl apply -f infra/demo-app/grafana.yaml
+```
+
 ## Check the deployment
 
 ```bash
@@ -74,6 +82,18 @@ kubectl port-forward -n mybookstore service/frontend 3000:80
 Then open:
 
 `http://localhost:3000`
+
+## Open the observability stack
+
+```bash
+kubectl port-forward -n mybookstore service/grafana 3001:3001
+kubectl port-forward -n mybookstore service/prometheus 9090:9090
+```
+
+- Grafana: `http://localhost:3001` (user: `admin`, password: `admin`)
+- Prometheus: `http://localhost:9090`
+
+The **MyBookstore – Overview** dashboard is auto-provisioned and shows availability, latency, error rate, request rate, CPU, and memory.
 
 ## Delete the local cluster
 
