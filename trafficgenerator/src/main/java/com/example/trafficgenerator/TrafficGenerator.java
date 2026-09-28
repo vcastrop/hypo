@@ -21,7 +21,7 @@ public class TrafficGenerator {
     }
 
     public void start() {
-        Flux.interval(Duration.ofSeconds(0.2))
+        Flux.interval(Duration.ofMillis(200))
             .flatMap(tick -> webClient.get()
                 .uri(targetPath)
                 .exchangeToMono(response -> {
