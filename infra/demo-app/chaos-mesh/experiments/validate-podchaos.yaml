@@ -1,0 +1,20 @@
+# ---------------------------------------------------------------------------
+#  validate-podchaos.yaml
+#  Kills one catalog-service pod in the mybookstore namespace.
+#  Runs once to prove Chaos Mesh can target demo-app workloads.
+# ---------------------------------------------------------------------------
+
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: validate-pod-kill
+  namespace: mybookstore
+spec:
+  action: pod-kill
+  mode: one                        # kill exactly one matching pod
+  selector:
+    namespaces:
+      - mybookstore
+    labelSelectors:
+      app: catalog-service
+  # No scheduler → runs as a one-shot experiment
