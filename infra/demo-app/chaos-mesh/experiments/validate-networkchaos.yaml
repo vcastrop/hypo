@@ -1,0 +1,24 @@
+# ---------------------------------------------------------------------------
+#  validate-networkchaos.yaml
+#  Injects 100 ms network latency into order-service pods for 30 seconds.
+#  Validates that Chaos Mesh can manipulate network conditions on demo-app pods.
+# ---------------------------------------------------------------------------
+
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: validate-network-delay
+  namespace: mybookstore
+spec:
+  action: delay
+  mode: all                        # affect every matching pod
+  selector:
+    namespaces:
+      - mybookstore
+    labelSelectors:
+      app: order-service
+  delay:
+    latency: "100ms"
+    correlation: "100"             # every packet is delayed
+    jitter: "0ms"
+  duration: "30s"                  # auto-recovers after 30 s

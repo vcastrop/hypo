@@ -95,6 +95,17 @@ kubectl port-forward -n mybookstore service/prometheus 9090:9090
 
 The **MyBookstore – Overview** dashboard is auto-provisioned and shows availability, latency, error rate, request rate, CPU, and memory.
 
+## Deploy Chaos Mesh (chaos engineering)
+
+```bash
+bash infra/demo-app/chaos-mesh/install-chaos-mesh.sh
+bash infra/demo-app/chaos-mesh/validate-chaos-mesh.sh
+```
+
+- Dashboard: `http://localhost:2333` (after port-forwarding)
+
+See [`chaos-mesh/README.md`](chaos-mesh/README.md) for details, validation experiments, and uninstall instructions.
+
 ## Delete the local cluster
 
 ```bash
