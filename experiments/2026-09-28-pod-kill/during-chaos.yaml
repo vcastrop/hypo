@@ -1,0 +1,44 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"chaos-mesh.org/v1alpha1","kind":"PodChaos","metadata":{"annotations":{},"name":"validate-pod-kill","namespace":"mybookstore"},"spec":{"action":"pod-kill","mode":"one","selector":{"labelSelectors":{"app":"catalog-service"},"namespaces":["mybookstore"]}}}
+  creationTimestamp: "2026-09-28T23:42:27Z"
+  finalizers:
+  - chaos-mesh/records
+  generation: 5
+  name: validate-pod-kill
+  namespace: mybookstore
+  resourceVersion: "555621"
+  uid: 4dda7624-0f36-4e81-8dde-5b4270d80138
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    labelSelectors:
+      app: catalog-service
+    namespaces:
+    - mybookstore
+status:
+  conditions:
+  - status: "True"
+    type: Selected
+  - status: "True"
+    type: AllInjected
+  - status: "False"
+    type: AllRecovered
+  - status: "False"
+    type: Paused
+  experiment:
+    containerRecords:
+    - events:
+      - operation: Apply
+        timestamp: "2026-09-28T23:42:27Z"
+        type: Succeeded
+      id: mybookstore/catalog-service-d757cbc55-8dw48
+      injectedCount: 1
+      phase: Injected
+      recoveredCount: 0
+      selectorKey: .
+    desiredPhase: Run

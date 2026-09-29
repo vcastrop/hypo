@@ -1,0 +1,11 @@
+NAME                              READY   STATUS    RESTARTS   AGE
+catalog-service-d757cbc55-8dw48   1/1     Running   0          163m
+catalog-service-d757cbc55-f677c   1/1     Running   0          143m
+catalog-service-d757cbc55-8dw48   1/1     Terminating   0          164m
+catalog-service-d757cbc55-8dw48   1/1     Terminating   0          164m
+catalog-service-d757cbc55-95pwr   0/1     Pending       0          0s
+catalog-service-d757cbc55-95pwr   0/1     Pending       0          0s
+catalog-service-d757cbc55-95pwr   0/1     ContainerCreating   0          0s
+catalog-service-d757cbc55-95pwr   0/1     ContainerCreating   0          1s
+catalog-service-d757cbc55-95pwr   0/1     Running             0          1s
+catalog-service-d757cbc55-95pwr   1/1     Running             0          7s
