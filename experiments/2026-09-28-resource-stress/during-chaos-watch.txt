@@ -1,0 +1,10 @@
+NAME                      DURATION
+catalog-resource-stress   60s
+catalog-resource-stress   60s
+catalog-resource-stress   60s
+catalog-resource-stress   60s
+catalog-resource-stress   60s
+catalog-resource-stress   60s
+catalog-resource-stress   60s
+catalog-resource-stress   60s
+catalog-resource-stress   60s
