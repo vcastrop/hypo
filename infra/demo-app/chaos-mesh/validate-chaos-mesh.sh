@@ -30,10 +30,10 @@ check() {
   shift
   if "$@" >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} ${desc}"
-    ((pass++))
+    pass=$((pass+1))
   else
     echo -e "  ${RED}✗${NC} ${desc}"
-    ((fail++))
+    fail=$((fail+1))
   fi
 }
 
@@ -79,7 +79,7 @@ check "PodChaos resource created" \
 PODCHAOS_STATUS=$(kubectl get podchaos validate-pod-kill -n mybookstore -o jsonpath='{.status}' 2>/dev/null || echo "")
 if [ -n "${PODCHAOS_STATUS}" ]; then
   echo -e "  ${GREEN}✓${NC} PodChaos experiment was processed by controller"
-  ((pass++))
+  pass=$((pass+1))
 else
   echo -e "  ${YELLOW}⚠${NC} PodChaos experiment status is empty (may need more time)"
 fi
@@ -96,7 +96,7 @@ check "NetworkChaos resource created" \
 NETCHAOS_STATUS=$(kubectl get networkchaos validate-network-delay -n mybookstore -o jsonpath='{.status}' 2>/dev/null || echo "")
 if [ -n "${NETCHAOS_STATUS}" ]; then
   echo -e "  ${GREEN}✓${NC} NetworkChaos experiment was processed by controller"
-  ((pass++))
+  pass=$((pass+1))
 else
   echo -e "  ${YELLOW}⚠${NC} NetworkChaos experiment status is empty (may need more time)"
 fi
@@ -106,7 +106,7 @@ echo ""
 echo ">>> Waiting for catalog-service to recover from pod kill..."
 kubectl wait --for=condition=Ready pods -l app=catalog-service \
   -n mybookstore --timeout=60s 2>/dev/null && \
-  echo -e "  ${GREEN}✓${NC} catalog-service recovered" && ((pass++)) || \
+  echo -e "  ${GREEN}✓${NC} catalog-service recovered" && pass=$((pass+1)) || \
   echo -e "  ${YELLOW}⚠${NC} catalog-service recovery timed out (may need more time)"
 
 # ---- 6. Clean up ----

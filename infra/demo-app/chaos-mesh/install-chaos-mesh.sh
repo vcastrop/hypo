@@ -42,8 +42,10 @@ helm upgrade --install chaos-mesh chaos-mesh/chaos-mesh \
   --set chaosDaemon.runtime=containerd \
   --set chaosDaemon.socketPath=/run/containerd/containerd.sock \
   --set dashboard.securityMode=false \
+  --set controllerManager.replicaCount=1 \
+  --set controllerManager.leaderElection.enabled=false \
   --wait \
-  --timeout 5m
+  --timeout 15m
 
 # ---- 4. Wait for pods ----
 echo ""

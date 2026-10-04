@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: catalog-network-delay
+  namespace: mybookstore
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces: [mybookstore]
+    labelSelectors:
+      app: catalog-service
+  delay:
+    latency: "200ms"
+    jitter: "0ms"
+    correlation: "100"
+  duration: "60s"
