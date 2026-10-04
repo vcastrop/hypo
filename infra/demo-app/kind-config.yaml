@@ -5,7 +5,10 @@ name: mybookstore
 
 nodes:
   - role: control-plane
+    image: kindest/node:v1.31.0
 
   - role: worker
+    image: kindest/node:v1.31.0
 
   - role: worker
+    image: kindest/node:v1.31.0
