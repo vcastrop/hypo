@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: catalog-network-loss
+  namespace: mybookstore
+spec:
+  action: loss
+  mode: one
+  selector:
+    namespaces: [mybookstore]
+    labelSelectors:
+      app: catalog-service
+  loss:
+    loss: "30"
+    correlation: "100"
+  duration: "60s"

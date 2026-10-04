@@ -1,0 +1,55 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"chaos-mesh.org/v1alpha1","kind":"NetworkChaos","metadata":{"annotations":{},"name":"catalog-network-delay","namespace":"mybookstore"},"spec":{"action":"delay","delay":{"correlation":"100","jitter":"0ms","latency":"200ms"},"duration":"60s","mode":"one","selector":{"labelSelectors":{"app":"catalog-service"},"namespaces":["mybookstore"]}}}
+  creationTimestamp: "2026-10-04T01:54:34Z"
+  finalizers:
+  - chaos-mesh/records
+  generation: 12
+  name: catalog-network-delay
+  namespace: mybookstore
+  resourceVersion: "11619"
+  uid: 340d7c5e-d6bc-4355-979f-8d24d0917599
+spec:
+  action: delay
+  delay:
+    correlation: "100"
+    jitter: 0ms
+    latency: 200ms
+  direction: to
+  duration: 60s
+  mode: one
+  selector:
+    labelSelectors:
+      app: catalog-service
+    namespaces:
+    - mybookstore
+status:
+  conditions:
+  - status: "True"
+    type: Selected
+  - status: "False"
+    type: AllInjected
+  - status: "True"
+    type: AllRecovered
+  - status: "False"
+    type: Paused
+  experiment:
+    containerRecords:
+    - events:
+      - operation: Apply
+        timestamp: "2026-10-04T01:54:34Z"
+        type: Succeeded
+      - operation: Recover
+        timestamp: "2026-10-04T01:55:34Z"
+        type: Succeeded
+      id: mybookstore/catalog-service-78d469d544-7lrtq
+      injectedCount: 1
+      phase: Not Injected
+      recoveredCount: 1
+      selectorKey: .
+    desiredPhase: Stop
+  instances:
+    mybookstore/catalog-service-78d469d544-7lrtq: 2

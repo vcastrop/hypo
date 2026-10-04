@@ -1,0 +1,3 @@
+NAME                               READY   STATUS    RESTARTS      AGE   IP           NODE                  NOMINATED NODE   READINESS GATES
+catalog-service-78d469d544-7lrtq   1/1     Running   2 (30m ago)   22h   10.244.2.8   mybookstore-worker2   <none>           <none>
+catalog-service-78d469d544-jtk6r   1/1     Running   2 (29m ago)   21h   10.244.1.6   mybookstore-worker    <none>           <none>
