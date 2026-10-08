@@ -1,16 +1,26 @@
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 
+import urllib3
 from kubernetes import client, config
+from kubernetes.client.exceptions import ApiException
 from kubernetes.config.config_exception import ConfigException
 
 from app.core.config import Settings, get_settings
+from app.core.errors import (
+    ClusterAccessDeniedError,
+    ClusterError,
+    ClusterUnreachableError,
+    ResourceNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class KubernetesConnectionError(RuntimeError):
+class KubernetesConnectionError(ClusterUnreachableError):
     """Raised when no valid Kubernetes configuration can be loaded."""
 
 
@@ -54,3 +64,18 @@ def _build_clients() -> K8sClients:
 def get_k8s_clients() -> K8sClients:
     """FastAPI dependency. Lazy: nothing is loaded at import or app startup."""
     return _build_clients()
+
+
+@contextmanager
+def translate_k8s_errors() -> Iterator[None]:
+    """Convert kubernetes/network exceptions into app.core.errors types."""
+    try:
+        yield
+    except ApiException as exc:
+        if exc.status in (401, 403):
+            raise ClusterAccessDeniedError(exc.reason or "access denied") from exc
+        if exc.status == 404:
+            raise ResourceNotFoundError(exc.reason or "not found") from exc
+        raise ClusterError(f"Kubernetes API error {exc.status}: {exc.reason}") from exc
+    except (urllib3.exceptions.HTTPError, OSError) as exc:
+        raise ClusterUnreachableError("Kubernetes API is unreachable") from exc
