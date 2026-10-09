@@ -1,16 +1,17 @@
 """Discovery endpoints – exposes Kubernetes service-discovery to the frontend."""
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.integrations.kubernetes import K8sClients, get_k8s_clients
 from app.core.errors import (
     ClusterAccessDeniedError,
     ClusterError,
     ClusterUnreachableError,
     ResourceNotFoundError,
 )
+from app.integrations.kubernetes import K8sClients, get_k8s_clients
 from app.modules.discovery import service
 from app.modules.discovery.schemas import NamespaceInfo, ServiceInfo, WorkloadInfo
 
@@ -42,8 +43,8 @@ def _handle_cluster_error(exc: ClusterError) -> HTTPException:
     summary="List namespaces visible to Hypo",
 )
 def list_namespaces(
+    clients: Annotated[K8sClients, Depends(get_k8s_clients)],
     include_system: bool = Query(False, description="Include kube-system and similar namespaces"),
-    clients: K8sClients = Depends(get_k8s_clients),
 ) -> list[NamespaceInfo]:
     """Return active Kubernetes namespaces.
 
@@ -64,7 +65,7 @@ def list_namespaces(
 )
 def list_services(
     namespace: str,
-    clients: K8sClients = Depends(get_k8s_clients),
+    clients: Annotated[K8sClients, Depends(get_k8s_clients)],
 ) -> list[ServiceInfo]:
     """Return services discovered inside *namespace* with port and selector
     metadata useful for experiment targeting.
@@ -82,7 +83,7 @@ def list_services(
 )
 def list_workloads(
     namespace: str,
-    clients: K8sClients = Depends(get_k8s_clients),
+    clients: Annotated[K8sClients, Depends(get_k8s_clients)],
 ) -> list[WorkloadInfo]:
     """Return Deployments and StatefulSets with replica counts so the
     frontend can show readiness status and help users pick experiment targets.

@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from app.integrations.kubernetes import K8sClients, get_k8s_clients
 from app.main import app
 
-
 # ── fakes ───────────────────────────────────────────────────────────
 
 
