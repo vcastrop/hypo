@@ -97,3 +97,87 @@ Do not bake kubeconfig, tokens, or `.env` into the image.
 | `HYPO_CORS_ORIGINS` | `[]` | JSON list of allowed origins |
 
 Discovery endpoints, experiment execution, and Kubernetes RBAC manifests are **not** in this skeleton. They land in PB-04 and later.
+
+## Discovery endpoints
+
+All discovery routes live under `/api/v1/discovery`. They require a reachable Kubernetes cluster (configured via the environment variables above).
+
+### `GET /api/v1/discovery/namespaces`
+
+List non-system namespaces visible to Hypo.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `include_system` | query, bool | `false` | Include kube-system, chaos-mesh, etc. |
+
+```bash
+curl http://localhost:8000/api/v1/discovery/namespaces
+```
+
+```json
+[
+  { "name": "mybookstore", "phase": "Active" }
+]
+```
+
+### `GET /api/v1/discovery/namespaces/{namespace}/services`
+
+List Kubernetes services in the given namespace with port and selector metadata.
+
+```bash
+curl http://localhost:8000/api/v1/discovery/namespaces/mybookstore/services
+```
+
+```json
+[
+  {
+    "name": "catalog-service",
+    "namespace": "mybookstore",
+    "type": "ClusterIP",
+    "cluster_ip": "10.96.100.10",
+    "selector": { "app": "catalog-service" },
+    "ports": [
+      { "name": "http", "port": 5001, "target_port": "5001", "protocol": "TCP" }
+    ]
+  }
+]
+```
+
+### `GET /api/v1/discovery/namespaces/{namespace}/workloads`
+
+List Deployments and StatefulSets with replica counts.
+
+```bash
+curl http://localhost:8000/api/v1/discovery/namespaces/mybookstore/workloads
+```
+
+```json
+[
+  {
+    "name": "catalog-service",
+    "namespace": "mybookstore",
+    "kind": "Deployment",
+    "replicas_desired": 2,
+    "replicas_ready": 2,
+    "labels": { "app": "catalog-service" }
+  },
+  {
+    "name": "mongodb",
+    "namespace": "mybookstore",
+    "kind": "StatefulSet",
+    "replicas_desired": 1,
+    "replicas_ready": 1,
+    "labels": { "app": "mongodb" }
+  }
+]
+```
+
+### Error responses
+
+| HTTP Code | Meaning |
+|---|---|
+| `404` | Namespace not found |
+| `403` | Cluster RBAC denied access |
+| `503` | Cluster unreachable |
+| `502` | Other Kubernetes API error |
+
