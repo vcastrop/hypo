@@ -28,6 +28,7 @@ class KubernetesConnectionError(ClusterUnreachableError):
 class K8sClients:
     core_v1: client.CoreV1Api  # namespaces, services, pods
     apps_v1: client.AppsV1Api  # deployments, statefulsets
+    custom_objects: client.CustomObjectsApi | None = None
 
 
 def _load_config(settings: Settings) -> None:
@@ -58,7 +59,11 @@ def _build_clients() -> K8sClients:
     settings = get_settings()
     _load_config(settings)
     logger.debug("Kubernetes configuration loaded (mode=%s)", settings.k8s_mode)
-    return K8sClients(core_v1=client.CoreV1Api(), apps_v1=client.AppsV1Api())
+    return K8sClients(
+        core_v1=client.CoreV1Api(),
+        apps_v1=client.AppsV1Api(),
+        custom_objects=client.CustomObjectsApi(),
+    )
 
 
 def get_k8s_clients() -> K8sClients:
