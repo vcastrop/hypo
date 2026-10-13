@@ -69,3 +69,153 @@ def test_rejects_invalid_duration():
     )
 
     assert response.status_code == 422
+
+
+# ── POST /api/v1/experiments/definitions/yaml ───────────────────────
+
+
+def test_generate_experiment_yaml_success():
+    response = client.post(
+        "/api/v1/experiments/definitions/yaml",
+        json=_payload(),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "yaml" in body
+    assert "manifest" in body
+    assert body["manifest"]["kind"] == "PodChaos"
+    assert "kind: PodChaos" in body["yaml"]
+    assert "action: pod-kill" in body["yaml"]
+
+
+def test_generate_experiment_yaml_invalid_blast_radius():
+    response = client.post(
+        "/api/v1/experiments/definitions/yaml",
+        json=_payload(replicas=3, affected_replicas=2),
+    )
+
+    assert response.status_code == 422
+
+
+# ── POST /api/v1/experiments/runs & GET /api/v1/experiments/runs ────
+
+
+class FakeCustomObjectsApi:
+    def __init__(self):
+        self.created = []
+        self.deleted = []
+
+    def create_namespaced_custom_object(self, group, version, namespace, plural, body):
+        self.created.append(body)
+        return body
+
+    def delete_namespaced_custom_object(self, group, version, namespace, plural, name):
+        self.deleted.append((plural, namespace, name))
+        return {}
+
+    def get_namespaced_custom_object(self, group, version, namespace, plural, name):
+        return {}
+
+
+class FakePrometheus:
+    def __init__(self, error_rate=0.0):
+        self.error_rate = error_rate
+
+    def get_error_rate(self, service_name, window="1m"):
+        return self.error_rate
+
+    def get_success_rate(self, service_name, window="1m"):
+        return 100.0 - self.error_rate
+
+    def query(self, query):
+        return None
+
+
+def test_run_experiment_completed_normally():
+    from app.integrations.kubernetes import K8sClients, get_k8s_clients
+    from app.integrations.prometheus import get_prometheus_client
+
+    fake_k8s = K8sClients(core_v1=None, apps_v1=None, custom_objects=FakeCustomObjectsApi())
+    fake_prom = FakePrometheus(error_rate=1.0)
+
+    app.dependency_overrides[get_k8s_clients] = lambda: fake_k8s
+    app.dependency_overrides[get_prometheus_client] = lambda: fake_prom
+
+    try:
+        run_payload = {
+            "definition_request": _payload(),
+            "abort_condition": {
+                "metric": "error_rate",
+                "threshold": 10.0,
+                "operator": ">",
+            },
+            "monitor_interval_seconds": 0.01,
+            "max_duration_seconds": 0.05,
+        }
+
+        response = client.post("/api/v1/experiments/runs", json=run_payload)
+        assert response.status_code == 201
+
+        data = response.json()
+        assert data["status"] == "completed"
+        assert data["abort_triggered"] is False
+        assert "kind: PodChaos" in data["chaos_yaml"]
+        assert len(fake_k8s.custom_objects.created) == 1
+        assert len(fake_k8s.custom_objects.deleted) == 1
+
+        run_id = data["id"]
+
+        # Test GET /api/v1/experiments/runs/{id}
+        get_resp = client.get(f"/api/v1/experiments/runs/{run_id}")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["id"] == run_id
+
+        # Test GET /api/v1/experiments/runs
+        list_resp = client.get("/api/v1/experiments/runs")
+        assert list_resp.status_code == 200
+        ids = [r["id"] for r in list_resp.json()]
+        assert run_id in ids
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_run_experiment_triggers_abort_on_breach():
+    from app.integrations.kubernetes import K8sClients, get_k8s_clients
+    from app.integrations.prometheus import get_prometheus_client
+
+    fake_k8s = K8sClients(core_v1=None, apps_v1=None, custom_objects=FakeCustomObjectsApi())
+    # 20% error rate breaches the 10% threshold
+    fake_prom = FakePrometheus(error_rate=20.0)
+
+    app.dependency_overrides[get_k8s_clients] = lambda: fake_k8s
+    app.dependency_overrides[get_prometheus_client] = lambda: fake_prom
+
+    try:
+        run_payload = {
+            "definition_request": _payload(),
+            "abort_condition": {
+                "metric": "error_rate",
+                "threshold": 10.0,
+                "operator": ">",
+            },
+            "monitor_interval_seconds": 0.01,
+            "max_duration_seconds": 5.0,
+        }
+
+        response = client.post("/api/v1/experiments/runs", json=run_payload)
+        assert response.status_code == 201
+
+        data = response.json()
+        assert data["status"] == "aborted"
+        assert data["abort_triggered"] is True
+        assert "threshold (10.0%)" in data["abort_reason"]
+        # Ensured deletion on abort
+        assert len(fake_k8s.custom_objects.deleted) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_nonexistent_run_returns_404():
+    response = client.get("/api/v1/experiments/runs/run-doesnotexist")
+    assert response.status_code == 404

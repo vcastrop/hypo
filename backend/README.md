@@ -181,3 +181,144 @@ curl http://localhost:8000/api/v1/discovery/namespaces/mybookstore/workloads
 | `503` | Cluster unreachable |
 | `502` | Other Kubernetes API error |
 
+## Experiment endpoints
+
+All experiment routes live under `/api/v1/experiments`.
+
+### `POST /api/v1/experiments/definitions`
+
+Define a chaos experiment with blast radius validation (enforces the 50% safety limit) and hypothesis generation.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/experiments/definitions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target": {
+      "name": "catalog-service",
+      "namespace": "mybookstore",
+      "kind": "Deployment",
+      "replicas": 2,
+      "labels": {"app": "catalog-service"}
+    },
+    "failure_type": "pod-kill",
+    "duration_seconds": 60,
+    "affected_replicas": 1
+  }'
+```
+
+### `POST /api/v1/experiments/definitions/yaml`
+
+Convert an experiment definition into a validated Chaos Mesh YAML manifest (`PodChaos`, `StressChaos`, or `NetworkChaos`) without applying it.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/experiments/definitions/yaml \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target": {
+      "name": "catalog-service",
+      "namespace": "mybookstore",
+      "kind": "Deployment",
+      "replicas": 2,
+      "labels": {"app": "catalog-service"}
+    },
+    "failure_type": "pod-kill",
+    "duration_seconds": 60,
+    "affected_replicas": 1
+  }'
+```
+
+Sample output:
+```json
+{
+  "yaml": "apiVersion: chaos-mesh.org/v1alpha1\nkind: PodChaos\nmetadata:\n  name: catalog-service-pod-kill\n  namespace: mybookstore\nspec:\n  action: pod-kill\n  mode: one\n  selector:\n    namespaces:\n    - mybookstore\n    labelSelectors:\n      app: catalog-service\n",
+  "manifest": {
+    "apiVersion": "chaos-mesh.org/v1alpha1",
+    "kind": "PodChaos",
+    "metadata": {
+      "name": "catalog-service-pod-kill",
+      "namespace": "mybookstore"
+    },
+    "spec": {
+      "action": "pod-kill",
+      "mode": "one",
+      "selector": {
+        "namespaces": ["mybookstore"],
+        "labelSelectors": {"app": "catalog-service"}
+      }
+    }
+  }
+}
+```
+
+### `POST /api/v1/experiments/runs`
+
+Execute an experiment end-to-end:
+1. Converts definition into a valid Chaos Mesh YAML.
+2. Applies the manifest automatically to the Kubernetes cluster.
+3. Monitors abort condition in real time via Prometheus (e.g. error rate threshold).
+4. If an abort threshold is breached, automatically deletes the Chaos Mesh resource immediately and marks the run as `aborted`.
+5. If the experiment completes normally, cleans up the chaos resource and marks the run as `completed`.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/experiments/runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "definition_request": {
+      "target": {
+        "name": "catalog-service",
+        "namespace": "mybookstore",
+        "kind": "Deployment",
+        "replicas": 2,
+        "labels": {"app": "catalog-service"}
+      },
+      "failure_type": "network-delay",
+      "duration_seconds": 60,
+      "affected_replicas": 1
+    },
+    "abort_condition": {
+      "metric": "error_rate",
+      "threshold": 10.0,
+      "operator": ">"
+    }
+  }'
+```
+
+Sample response:
+```json
+{
+  "id": "run-a1b2c3d4",
+  "experiment": {
+    "target": {
+      "name": "catalog-service",
+      "namespace": "mybookstore",
+      "kind": "Deployment",
+      "replicas": 2,
+      "labels": {"app": "catalog-service"}
+    },
+    "failure_type": "network-delay",
+    "blast_radius_percentage": 50.0,
+    "duration_seconds": 60,
+    "hypothesis": "If network delay affects 1 of 2 replicas of catalog-service, the service should remain available, although latency may increase.",
+    "affected_replicas": 1
+  },
+  "chaos_yaml": "apiVersion: chaos-mesh.org/v1alpha1\nkind: NetworkChaos\n...",
+  "status": "completed",
+  "abort_triggered": false,
+  "abort_reason": null,
+  "metrics_observed": [
+    {"timestamp": 1728860000.1, "metric": "error_rate", "value": 0.0}
+  ],
+  "started_at": "2026-10-12T22:50:00.000000+00:00",
+  "ended_at": "2026-10-12T22:51:00.000000+00:00"
+}
+```
+
+### `GET /api/v1/experiments/runs`
+
+List all recorded experiment runs and their outcomes.
+
+### `GET /api/v1/experiments/runs/{run_id}`
+
+Retrieve the full details of a specific experiment run by ID.
+
+
