@@ -12,11 +12,15 @@ from app.modules.experiments.schemas import (
     AbortCondition,
     ExperimentDefinition,
     ExperimentDefinitionRequest,
+    ExperimentEvaluation,
     ExperimentRunRequest,
     ExperimentRunResult,
     ExperimentStatus,
+    ExperimentVerdict,
     FailureType,
     MetricSample,
+    SuccessCriteria,
+    WindowMetrics,
 )
 
 logger = logging.getLogger(__name__)
@@ -262,6 +266,143 @@ def sample_metric(
     return prometheus_client.query(metric_name)
 
 
+def pull_window_metrics(
+    target_name: str,
+    prometheus_client: PrometheusClient | None,
+    window: str = "1m",
+) -> WindowMetrics:
+    """Pull snapshot of SLI metrics (error rate, success rate, p95 latency) for a given window."""
+    if prometheus_client is None:
+        return WindowMetrics()
+
+    err = (
+        prometheus_client.get_error_rate(target_name, window=window)
+        if hasattr(prometheus_client, "get_error_rate")
+        else None
+    )
+    succ = (
+        prometheus_client.get_success_rate(target_name, window=window)
+        if hasattr(prometheus_client, "get_success_rate")
+        else None
+    )
+    p95 = (
+        prometheus_client.get_p95_latency(target_name, window=window)
+        if hasattr(prometheus_client, "get_p95_latency")
+        else None
+    )
+
+    return WindowMetrics(
+        error_rate=err,
+        success_rate=succ,
+        p95_latency_ms=p95,
+    )
+
+
+def compute_recovery_time(
+    metrics_observed: list[MetricSample],
+    start_recovery_time: float,
+    threshold: float,
+) -> float | None:
+    """Compute seconds it took for metric to recover under threshold after chaos ended."""
+    if not metrics_observed:
+        return None
+
+    post_chaos_samples = [s for s in metrics_observed if s.timestamp >= start_recovery_time]
+    if not post_chaos_samples:
+        return None
+
+    for sample in post_chaos_samples:
+        if sample.value <= threshold:
+            return round(max(0.0, sample.timestamp - start_recovery_time), 2)
+
+    return None
+
+
+def evaluate_experiment(
+    experiment: ExperimentDefinition,
+    status: ExperimentStatus,
+    abort_triggered: bool,
+    abort_reason: str | None,
+    criteria: SuccessCriteria,
+    before_metrics: WindowMetrics,
+    during_metrics: WindowMetrics,
+    after_metrics: WindowMetrics,
+    recovery_time_seconds: float | None = None,
+) -> ExperimentEvaluation:
+    """Evaluate experiment results against defined success criteria (SLOs) and hypothesis."""
+    details: list[str] = []
+    passed = True
+
+    if abort_triggered or status == ExperimentStatus.ABORTED:
+        passed = False
+        details.append(f"Experiment aborted prematurely due to safety condition: {abort_reason}")
+
+    # Evaluate after metrics (steady state recovery)
+    if after_metrics.error_rate is not None:
+        if after_metrics.error_rate > criteria.max_error_rate_percentage:
+            passed = False
+            details.append(
+                f"Post-chaos error rate ({after_metrics.error_rate:.2f}%) "
+                f"exceeded threshold ({criteria.max_error_rate_percentage:.2f}%)"
+            )
+        else:
+            details.append(
+                f"Post-chaos error rate ({after_metrics.error_rate:.2f}%) "
+                f"met SLO threshold (<={criteria.max_error_rate_percentage:.2f}%)"
+            )
+
+    if after_metrics.success_rate is not None:
+        if after_metrics.success_rate < criteria.min_success_rate_percentage:
+            passed = False
+            details.append(
+                f"Post-chaos success rate ({after_metrics.success_rate:.2f}%) "
+                f"below threshold ({criteria.min_success_rate_percentage:.2f}%)"
+            )
+        else:
+            details.append(
+                f"Post-chaos success rate ({after_metrics.success_rate:.2f}%) "
+                f"met SLO threshold (>={criteria.min_success_rate_percentage:.2f}%)"
+            )
+
+    if criteria.max_p95_latency_ms is not None and after_metrics.p95_latency_ms is not None:
+        if after_metrics.p95_latency_ms > criteria.max_p95_latency_ms:
+            passed = False
+            details.append(
+                f"Post-chaos P95 latency ({after_metrics.p95_latency_ms:.1f}ms) "
+                f"exceeded threshold ({criteria.max_p95_latency_ms:.1f}ms)"
+            )
+        else:
+            details.append(
+                f"Post-chaos P95 latency ({after_metrics.p95_latency_ms:.1f}ms) "
+                f"met SLO threshold (<={criteria.max_p95_latency_ms:.1f}ms)"
+            )
+
+    if criteria.max_recovery_time_seconds is not None and recovery_time_seconds is not None:
+        if recovery_time_seconds > criteria.max_recovery_time_seconds:
+            passed = False
+            details.append(
+                f"Recovery time ({recovery_time_seconds:.1f}s) "
+                f"exceeded allowed time ({criteria.max_recovery_time_seconds:.1f}s)"
+            )
+        else:
+            details.append(
+                f"Recovery time ({recovery_time_seconds:.1f}s) "
+                f"within threshold (<={criteria.max_recovery_time_seconds:.1f}s)"
+            )
+
+    verdict = ExperimentVerdict.PASS if passed else ExperimentVerdict.FAIL
+
+    return ExperimentEvaluation(
+        verdict=verdict,
+        hypothesis_met=passed,
+        recovery_time_seconds=recovery_time_seconds,
+        before_metrics=before_metrics,
+        during_metrics=during_metrics,
+        after_metrics=after_metrics,
+        details=details,
+    )
+
+
 def execute_experiment(
     request: ExperimentRunRequest,
     chaos_client: ChaosMeshClient,
@@ -311,6 +452,9 @@ def execute_experiment(
         duration,
     )
 
+    # 0. Pull before-metrics baseline
+    before_metrics = pull_window_metrics(experiment.target.name, prometheus_client)
+
     # 1. Apply automatically to Kubernetes
     chaos_client.apply_experiment(manifest)
 
@@ -354,12 +498,55 @@ def execute_experiment(
                 time.sleep(sleep_duration)
 
     finally:
+        # Snapshot during metrics right before cleanup
+        during_metrics = pull_window_metrics(experiment.target.name, prometheus_client)
+        post_chaos_start = time.time()
+
         # 3. Always clean up / remove the chaos injection from the cluster
         logger.info("Cleaning up chaos resource %s/%s (%s)", namespace, name, kind)
         chaos_client.delete_experiment(kind=kind, namespace=namespace, name=name)
 
+    # Sample immediate post-chaos metric to verify recovery
+    if prometheus_client is not None and request.abort_condition:
+        post_val = sample_metric(
+            request.abort_condition.metric,
+            experiment.target.name,
+            prometheus_client,
+        )
+        if post_val is not None:
+            metrics_observed.append(
+                MetricSample(
+                    timestamp=time.time(),
+                    metric=request.abort_condition.metric,
+                    value=post_val,
+                )
+            )
+
+    # 4. Pull after-metrics snapshot
+    after_metrics = pull_window_metrics(experiment.target.name, prometheus_client)
+
+    # 5. Compute recovery time
+    recovery_time = compute_recovery_time(
+        metrics_observed=metrics_observed,
+        start_recovery_time=post_chaos_start,
+        threshold=request.success_criteria.max_error_rate_percentage,
+    )
+
     status = ExperimentStatus.ABORTED if abort_triggered else ExperimentStatus.COMPLETED
     ended_at = datetime.now(UTC).isoformat()
+
+    # 6. Evaluate experiment results against success criteria and SLOs
+    evaluation = evaluate_experiment(
+        experiment=experiment,
+        status=status,
+        abort_triggered=abort_triggered,
+        abort_reason=abort_reason,
+        criteria=request.success_criteria,
+        before_metrics=before_metrics,
+        during_metrics=during_metrics,
+        after_metrics=after_metrics,
+        recovery_time_seconds=recovery_time,
+    )
 
     result = ExperimentRunResult(
         id=run_id,
@@ -371,6 +558,7 @@ def execute_experiment(
         metrics_observed=metrics_observed,
         started_at=started_at,
         ended_at=ended_at,
+        evaluation=evaluation,
     )
 
     _RUN_HISTORY[run_id] = result

@@ -163,6 +163,8 @@ def test_run_experiment_completed_normally():
         assert "kind: PodChaos" in data["chaos_yaml"]
         assert len(fake_k8s.custom_objects.created) == 1
         assert len(fake_k8s.custom_objects.deleted) == 1
+        assert data["evaluation"] is not None
+        assert data["evaluation"]["verdict"] in ["PASS", "FAIL"]
 
         run_id = data["id"]
 

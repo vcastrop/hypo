@@ -58,6 +58,46 @@ class MetricSample(BaseModel):
     value: float
 
 
+class ExperimentVerdict(StrEnum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+
+
+class SuccessCriteria(BaseModel):
+    max_error_rate_percentage: float = Field(
+        default=1.0,
+        description="Max acceptable error rate percentage (SLO: <= 1.0%)",
+    )
+    min_success_rate_percentage: float = Field(
+        default=99.0,
+        description="Min acceptable success rate percentage (SLO: >= 99.0%)",
+    )
+    max_p95_latency_ms: float | None = Field(
+        default=100.0,
+        description="Max acceptable P95 latency in ms (SLO: <= 100ms)",
+    )
+    max_recovery_time_seconds: float | None = Field(
+        default=60.0,
+        description="Max acceptable recovery time in seconds after chaos stops",
+    )
+
+
+class WindowMetrics(BaseModel):
+    error_rate: float | None = None
+    success_rate: float | None = None
+    p95_latency_ms: float | None = None
+
+
+class ExperimentEvaluation(BaseModel):
+    verdict: ExperimentVerdict
+    hypothesis_met: bool
+    recovery_time_seconds: float | None = None
+    before_metrics: WindowMetrics = Field(default_factory=WindowMetrics)
+    during_metrics: WindowMetrics = Field(default_factory=WindowMetrics)
+    after_metrics: WindowMetrics = Field(default_factory=WindowMetrics)
+    details: list[str] = []
+
+
 class ExperimentYamlResponse(BaseModel):
     yaml: str
     manifest: dict[str, Any]
@@ -69,6 +109,7 @@ class ExperimentRunRequest(BaseModel):
     abort_condition: AbortCondition = Field(
         default_factory=lambda: AbortCondition(metric="error_rate", threshold=10.0, operator=">")
     )
+    success_criteria: SuccessCriteria = Field(default_factory=SuccessCriteria)
     monitor_interval_seconds: float = Field(default=1.0, gt=0)
     max_duration_seconds: float | None = Field(default=None, gt=0)
 
@@ -83,3 +124,4 @@ class ExperimentRunResult(BaseModel):
     metrics_observed: list[MetricSample] = []
     started_at: str | None = None
     ended_at: str | None = None
+    evaluation: ExperimentEvaluation | None = None
