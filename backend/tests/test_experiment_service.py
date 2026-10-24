@@ -305,6 +305,12 @@ def test_executes_experiment_completed_normally():
     assert len(chaos_client.deleted) == 1
     assert chaos_client.deleted[0] == ("PodChaos", "mybookstore", "catalog-service-pod-kill")
     assert len(result.metrics_observed) > 0
+    assert result.evaluation is not None
+    assert result.evaluation.verdict.value == "PASS"
+    assert result.evaluation.hypothesis_met is True
+    assert result.evaluation.before_metrics.error_rate == 0.5
+    assert result.evaluation.during_metrics.error_rate == 0.5
+    assert result.evaluation.after_metrics.error_rate == 0.5
 
 
 def test_executes_experiment_aborts_on_threshold_breach():
@@ -354,3 +360,68 @@ def test_executes_experiment_aborts_on_threshold_breach():
         "mybookstore",
         "catalog-service-network-delay",
     )
+    assert result.evaluation is not None
+    assert result.evaluation.verdict.value == "FAIL"
+    assert result.evaluation.hypothesis_met is False
+    assert any("aborted prematurely" in d for d in result.evaluation.details)
+
+
+def test_evaluate_experiment_pass_and_fail():
+    from app.modules.experiments.schemas import (
+        ExperimentEvaluation,
+        ExperimentStatus,
+        ExperimentVerdict,
+        SuccessCriteria,
+        WindowMetrics,
+    )
+    from app.modules.experiments.service import evaluate_experiment
+
+    exp = define_experiment(
+        ExperimentDefinitionRequest(
+            target=_target(),
+            failure_type=FailureType.POD_KILL,
+            duration_seconds=60,
+            affected_replicas=1,
+        )
+    )
+
+    criteria = SuccessCriteria(
+        max_error_rate_percentage=1.0,
+        min_success_rate_percentage=99.0,
+        max_p95_latency_ms=100.0,
+        max_recovery_time_seconds=60.0,
+    )
+
+    # 1. Successful evaluation (PASS)
+    eval_pass = evaluate_experiment(
+        experiment=exp,
+        status=ExperimentStatus.COMPLETED,
+        abort_triggered=False,
+        abort_reason=None,
+        criteria=criteria,
+        before_metrics=WindowMetrics(error_rate=0.0, success_rate=100.0, p95_latency_ms=45.0),
+        during_metrics=WindowMetrics(error_rate=0.5, success_rate=99.5, p95_latency_ms=80.0),
+        after_metrics=WindowMetrics(error_rate=0.1, success_rate=99.9, p95_latency_ms=50.0),
+        recovery_time_seconds=5.2,
+    )
+    assert isinstance(eval_pass, ExperimentEvaluation)
+    assert eval_pass.verdict == ExperimentVerdict.PASS
+    assert eval_pass.hypothesis_met is True
+    assert eval_pass.recovery_time_seconds == 5.2
+
+    # 2. Failed evaluation (FAIL due to high post-chaos error rate)
+    eval_fail = evaluate_experiment(
+        experiment=exp,
+        status=ExperimentStatus.COMPLETED,
+        abort_triggered=False,
+        abort_reason=None,
+        criteria=criteria,
+        before_metrics=WindowMetrics(error_rate=0.0, success_rate=100.0, p95_latency_ms=45.0),
+        during_metrics=WindowMetrics(error_rate=5.0, success_rate=95.0, p95_latency_ms=150.0),
+        after_metrics=WindowMetrics(error_rate=2.5, success_rate=97.5, p95_latency_ms=120.0),
+        recovery_time_seconds=75.0,
+    )
+    assert eval_fail.verdict == ExperimentVerdict.FAIL
+    assert eval_fail.hypothesis_met is False
+    assert any("exceeded threshold" in d for d in eval_fail.details)
+    assert any("exceeded allowed time" in d for d in eval_fail.details)
