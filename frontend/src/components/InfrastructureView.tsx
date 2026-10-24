@@ -219,14 +219,14 @@ export const InfrastructureView: React.FC = () => {
       {/* ── SECCIÓN 1: MÉTRICAS Y RESUMEN GENERAL ── */}
       <div>
         <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-blue-400" />
+          <Activity className="w-5 h-5 text-red-500" />
           Resumen del Clúster
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-slate-600 transition-colors">
+          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-red-500/50 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">Cargas (Workloads)</span>
-              <Box className="w-5 h-5 text-blue-400" />
+              <Box className="w-5 h-5 text-slate-300" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-white">{workloads.length}</span>
@@ -238,22 +238,22 @@ export const InfrastructureView: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-slate-600 transition-colors">
+          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-red-500/50 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">Servicios de Red</span>
-              <Server className="w-5 h-5 text-blue-400" />
+              <Server className="w-5 h-5 text-slate-300" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-white">{services.length}</span>
               <span className="text-sm text-slate-400">endpoints K8s</span>
             </div>
-            <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-blue-400">
-              <Radio className="w-4 h-4" />
+            <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-300">
+              <Radio className="w-4 h-4 text-emerald-400" />
               <span>{services.filter((s) => s.is_targetable).length} accesibles</span>
             </div>
           </div>
 
-          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-slate-600 transition-colors">
+          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-red-500/50 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">Réplicas Disponibles</span>
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -271,7 +271,7 @@ export const InfrastructureView: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-slate-600 transition-colors">
+          <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-red-500/50 transition-colors">
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-bold uppercase tracking-wider">Inyección de Fallas</span>
               <Shield className="w-5 h-5 text-red-500" />
@@ -295,7 +295,7 @@ export const InfrastructureView: React.FC = () => {
             onClick={() => setActiveTab('all')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
               activeTab === 'all'
-                ? 'bg-[#2a2a2a] text-white shadow'
+                ? 'bg-red-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -305,7 +305,7 @@ export const InfrastructureView: React.FC = () => {
             onClick={() => setActiveTab('workloads')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
               activeTab === 'workloads'
-                ? 'bg-blue-600 text-white shadow'
+                ? 'bg-red-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -315,7 +315,7 @@ export const InfrastructureView: React.FC = () => {
             onClick={() => setActiveTab('services')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
               activeTab === 'services'
-                ? 'bg-blue-600 text-white shadow'
+                ? 'bg-red-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -330,7 +330,7 @@ export const InfrastructureView: React.FC = () => {
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             placeholder="Filtrar por nombre, etiquetas..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#141414] border border-[#2e2e2e] text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#141414] border border-[#2e2e2e] text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500"
           />
         </div>
       </div>
@@ -350,7 +350,7 @@ export const InfrastructureView: React.FC = () => {
             {filteredWorkloads.map((workload) => (
               <div
                 key={workload.name}
-                className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-2xl p-6 shadow-lg hover:border-slate-500 transition-all flex flex-col justify-between"
+                className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-2xl p-6 shadow-lg hover:border-red-500/50 transition-all flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between mb-4">
@@ -358,7 +358,7 @@ export const InfrastructureView: React.FC = () => {
                       <h3 className="text-base font-bold text-white tracking-wide font-mono">
                         {workload.name}
                       </h3>
-                      <span className="text-xs text-blue-400 font-semibold">{workload.kind}</span>
+                      <span className="text-xs text-slate-400 font-semibold">{workload.kind}</span>
                     </div>
 
                     <span
@@ -433,7 +433,7 @@ export const InfrastructureView: React.FC = () => {
         <section className="space-y-4 pt-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-              <Server className="w-6 h-6 text-blue-400" />
+              <Server className="w-6 h-6 text-red-500" />
               Red y Servicios Expuestos ({filteredServices.length})
             </h2>
             <span className="text-xs text-slate-400">ClusterIPs y puertos mapeados</span>
@@ -443,7 +443,7 @@ export const InfrastructureView: React.FC = () => {
             {filteredServices.map((service) => (
               <div
                 key={service.name}
-                className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-2xl p-6 shadow-md"
+                className="bg-[#1c1c1c] border border-[#2e2e2e] rounded-2xl p-6 shadow-md hover:border-red-500/50 transition-colors"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -451,7 +451,7 @@ export const InfrastructureView: React.FC = () => {
                     <span className="text-xs text-slate-400">{service.type}</span>
                   </div>
 
-                  <span className="text-xs font-mono font-semibold text-blue-400 bg-blue-950/40 border border-blue-800/40 px-3 py-1 rounded-lg">
+                  <span className="text-xs font-mono font-semibold text-slate-300 bg-[#262626] border border-[#383838] px-3 py-1 rounded-lg">
                     {service.cluster_ip || 'None'}
                   </span>
                 </div>
@@ -467,7 +467,7 @@ export const InfrastructureView: React.FC = () => {
                         key={idx}
                         className="px-2.5 py-1 rounded-lg bg-[#262626] border border-[#383838] text-xs font-mono text-slate-300"
                       >
-                        <span className="text-blue-400 font-bold">{p.port}</span>:{p.target_port}/
+                        <span className="text-red-400 font-bold">{p.port}</span>:{p.target_port}/
                         {p.protocol}
                       </span>
                     ))}

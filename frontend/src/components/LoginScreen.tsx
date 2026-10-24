@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { PrivacyPolicyModal } from './PrivacyPolicyModal';
+import { HypoWordmark } from './HippoLogo';
 
 export const LoginScreen: React.FC = () => {
   const { login } = useAuth();
@@ -22,14 +23,11 @@ export const LoginScreen: React.FC = () => {
     <div className="min-h-screen bg-[#121212] flex flex-col justify-center items-center px-4">
       {/* Login Modal Box estilo Claude / ChatGPT */}
       <div className="w-full max-w-[420px] bg-[#1e1e1e] border border-[#2a2a2a] rounded-3xl p-8 shadow-2xl relative">
-        {/* Header con marca limpia */}
+        {/* Header con el logo del hipopótamo integrado en 'Hypo' */}
         <div className="text-center mb-7">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-red-600 rounded-2xl mb-3 shadow-md">
-            <span className="text-white font-bold text-xl">H</span>
+          <div className="mb-2 flex justify-center">
+            <HypoWordmark size="lg" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-2">
-            HYPO
-          </h1>
           <p className="text-sm text-slate-400 mt-1 font-medium">
             Resilience & Chaos Engineering Platform
           </p>
@@ -40,7 +38,7 @@ export const LoginScreen: React.FC = () => {
           <button
             type="button"
             onClick={() => handleSubmit({ preventDefault: () => {} } as any)}
-            className="w-full py-3 px-4 rounded-xl bg-[#2a2a2a] hover:bg-[#333333] border border-[#383838] text-white text-sm font-medium transition-colors flex items-center justify-center gap-3 cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl bg-[#2a2a2a] hover:bg-[#333333] hover:border-slate-500 border border-[#383838] text-white text-sm font-medium transition-colors flex items-center justify-center gap-3 cursor-pointer"
           >
             {/* Google G icon */}
             <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -67,10 +65,10 @@ export const LoginScreen: React.FC = () => {
           <button
             type="button"
             onClick={() => handleSubmit({ preventDefault: () => {} } as any)}
-            className="w-full py-3 px-4 rounded-xl bg-[#2a2a2a] hover:bg-[#333333] border border-[#383838] text-white text-sm font-medium transition-colors flex items-center justify-center gap-3 cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl bg-[#2a2a2a] hover:bg-[#333333] hover:border-slate-500 border border-[#383838] text-white text-sm font-medium transition-colors flex items-center justify-center gap-3 cursor-pointer"
           >
             {/* Enterprise Kubernetes / OIDC icon */}
-            <svg className="w-4 h-4 fill-blue-400" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 fill-red-500" viewBox="0 0 24 24">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
             <span>Continuar con Cluster OIDC</span>
@@ -128,7 +126,7 @@ export const LoginScreen: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowPrivacy(true)}
-            className="text-blue-400 hover:text-blue-300 underline font-medium cursor-pointer"
+            className="text-red-400 hover:text-red-300 underline font-medium cursor-pointer"
           >
             Política de Privacidad
           </button>{' '}
