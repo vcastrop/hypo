@@ -173,38 +173,38 @@ export const InfrastructureView: React.FC = () => {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-6 py-6">
       {/* Top Banner / Breadcrumb */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#21262D]">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-300 mb-1">
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-400 mb-1">
             <span>INFRASTRUCTURE</span>
             <span>/</span>
-            <span className="text-amber-400 font-semibold">{selectedNamespace}</span>
+            <span className="text-slate-200 font-semibold">{selectedNamespace}</span>
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-3">
             Cluster Topology & Services
-            <span className="text-xs font-normal font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#161B22] border border-[#30363D] text-slate-300 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               Live Sync
             </span>
           </h2>
-          <p className="text-sm text-slate-300 mt-1">
-            Discovered microservices and workloads ready for chaos injection and steady-state validation.
+          <p className="text-xs text-slate-400 mt-0.5">
+            Discovered microservices and workloads ready for fault injection and SLO validation.
           </p>
         </div>
 
         {/* Namespace selector & controls */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-[#0E1422] border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
-            <Layers className="w-4 h-4 text-slate-300 mr-2" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center bg-[#161B22] border border-[#30363D] rounded px-2.5 py-1 text-xs">
+            <Layers className="w-3.5 h-3.5 text-slate-400 mr-2" />
             <select
               value={selectedNamespace}
               onChange={(e) => setSelectedNamespace(e.target.value)}
-              className="bg-transparent text-sm text-slate-200 font-medium focus:outline-none cursor-pointer"
+              className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer"
             >
               {namespaces.map((ns) => (
-                <option key={ns.name} value={ns.name} className="bg-slate-900 text-slate-200">
+                <option key={ns.name} value={ns.name} className="bg-[#161B22] text-slate-200">
                   {ns.name}
                 </option>
               ))}
@@ -214,161 +214,152 @@ export const InfrastructureView: React.FC = () => {
           <button
             onClick={() => loadDiscoveryData(selectedNamespace)}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-[#0E1422] border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-all shadow-sm active:scale-95"
+            className="p-1.5 rounded bg-[#161B22] border border-[#30363D] hover:bg-[#21262D] text-slate-300 transition-colors"
             title="Refresh Discovery Data"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-red-400' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* Metrics Summary Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-[#0E1422]/70 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-colors">
-          <div className="flex items-center justify-between text-slate-300 mb-2">
-            <span className="text-xs font-mono font-medium tracking-wider uppercase">Workloads</span>
-            <Box className="w-4 h-4 text-amber-400/80" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div className="bg-[#161B22] border border-[#30363D] rounded p-4">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-mono uppercase tracking-wider">Workloads</span>
+            <Box className="w-4 h-4 text-slate-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold font-mono text-white">{workloads.length}</span>
-            <span className="text-xs text-slate-300">active deployments</span>
+            <span className="text-2xl font-bold font-mono text-white">{workloads.length}</span>
+            <span className="text-xs text-slate-400">deployments</span>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>{workloads.filter((w) => w.is_ready).length} healthy</span>
           </div>
         </div>
 
-        <div className="bg-[#0E1422]/70 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-colors">
-          <div className="flex items-center justify-between text-slate-300 mb-2">
-            <span className="text-xs font-mono font-medium tracking-wider uppercase">Kubernetes Services</span>
-            <Server className="w-4 h-4 text-blue-400/80" />
+        <div className="bg-[#161B22] border border-[#30363D] rounded p-4">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-mono uppercase tracking-wider">K8s Services</span>
+            <Server className="w-4 h-4 text-slate-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold font-mono text-white">{services.length}</span>
-            <span className="text-xs text-slate-300">network endpoints</span>
+            <span className="text-2xl font-bold font-mono text-white">{services.length}</span>
+            <span className="text-xs text-slate-400">endpoints</span>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-blue-400 font-medium">
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-blue-400">
             <Radio className="w-3.5 h-3.5" />
             <span>{services.filter((s) => s.is_targetable).length} targetable</span>
           </div>
         </div>
 
-        <div className="bg-[#0E1422]/70 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-colors">
-          <div className="flex items-center justify-between text-slate-300 mb-2">
-            <span className="text-xs font-mono font-medium tracking-wider uppercase">Replicas Online</span>
-            <Activity className="w-4 h-4 text-emerald-400/80" />
+        <div className="bg-[#161B22] border border-[#30363D] rounded p-4">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-mono uppercase tracking-wider">Replicas Online</span>
+            <Activity className="w-4 h-4 text-slate-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold font-mono text-white">
+            <span className="text-2xl font-bold font-mono text-white">
               {workloads.reduce((acc, w) => acc + w.ready_replicas, 0)}
             </span>
-            <span className="text-xs text-slate-300">
+            <span className="text-xs text-slate-400">
               / {workloads.reduce((acc, w) => acc + w.replicas, 0)} total
             </span>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-300 font-mono">
+          <div className="mt-2 text-xs text-slate-400 font-mono">
             <span>Namespace: {selectedNamespace}</span>
           </div>
         </div>
 
-        <div className="bg-[#0E1422]/70 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-sm relative overflow-hidden group hover:border-slate-700/80 transition-colors">
-          <div className="flex items-center justify-between text-slate-300 mb-2">
-            <span className="text-xs font-mono font-medium tracking-wider uppercase">Chaos Readiness</span>
-            <Shield className="w-4 h-4 text-amber-500" />
+        <div className="bg-[#161B22] border border-[#30363D] rounded p-4">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-mono uppercase tracking-wider">Chaos Engine</span>
+            <Shield className="w-4 h-4 text-red-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold font-mono text-amber-400">100%</span>
-            <span className="text-xs text-slate-300">targetable</span>
+            <span className="text-2xl font-bold font-mono text-red-400">Active</span>
+            <span className="text-xs text-slate-400">Chaos Mesh</span>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-400/90 font-medium">
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-red-400">
             <Zap className="w-3.5 h-3.5" />
-            <span>Chaos Mesh ready</span>
+            <span>CRDs injected</span>
           </div>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0E1422]/40 border border-slate-800/60 p-3 rounded-2xl mb-6">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#161B22] border border-[#30363D] p-2.5 rounded mb-5">
         <div className="flex items-center gap-1 w-full sm:w-auto">
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
               activeTab === 'all'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                : 'text-slate-300 hover:text-slate-100'
+                ? 'bg-[#21262D] text-white border border-[#30363D]'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            All Resources ({workloads.length + services.length})
+            All ({workloads.length + services.length})
           </button>
           <button
             onClick={() => setActiveTab('workloads')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
               activeTab === 'workloads'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                : 'text-slate-300 hover:text-slate-100'
+                ? 'bg-[#21262D] text-white border border-[#30363D]'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Workloads ({workloads.length})
           </button>
           <button
             onClick={() => setActiveTab('services')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
               activeTab === 'services'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                : 'text-slate-300 hover:text-slate-100'
+                ? 'bg-[#21262D] text-white border border-[#30363D]'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Services ({services.length})
           </button>
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-300 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="relative w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Search service, workload, label..."
-            className="w-full pl-9 pr-3.5 py-1.5 rounded-xl bg-[#090D16] border border-slate-800 text-slate-200 placeholder-slate-400 text-xs focus:outline-none focus:border-amber-500/50"
+            placeholder="Filter resources..."
+            className="w-full pl-8 pr-3 py-1 rounded bg-[#0D1117] border border-[#30363D] text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-red-500 font-mono"
           />
         </div>
       </div>
 
       {/* Discovered Resources Grid */}
       {(activeTab === 'all' || activeTab === 'workloads') && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold tracking-wider uppercase text-slate-300 font-mono flex items-center gap-2">
-              <Box className="w-4 h-4 text-amber-400" />
-              Workloads & Deployments ({filteredWorkloads.length})
-            </h3>
-          </div>
+        <div className="mb-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono flex items-center gap-2 mb-3">
+            <Box className="w-3.5 h-3.5 text-slate-400" />
+            Deployments ({filteredWorkloads.length})
+          </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredWorkloads.map((workload) => (
               <div
                 key={workload.name}
-                className="bg-[#0E1422]/90 border border-slate-800/90 rounded-2xl p-5 hover:border-slate-700 transition-all hover:shadow-xl hover:shadow-black/50 group"
+                className="bg-[#161B22] border border-[#30363D] rounded p-4 hover:border-slate-500 transition-colors"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-mono text-xs font-bold">
-                      {workload.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-100 group-hover:text-amber-300 transition-colors">
-                        {workload.name}
-                      </h4>
-                      <span className="text-[11px] font-mono text-slate-300">{workload.kind}</span>
-                    </div>
+                <div className="flex items-start justify-between mb-2.5">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-100 font-mono">{workload.name}</h4>
+                    <span className="text-[11px] text-slate-400">{workload.kind}</span>
                   </div>
 
                   <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium font-mono ${
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono ${
                       workload.is_ready
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40'
+                        : 'bg-amber-950/40 text-amber-400 border border-amber-800/40'
                     }`}
                   >
                     <span
@@ -376,16 +367,14 @@ export const InfrastructureView: React.FC = () => {
                         workload.is_ready ? 'bg-emerald-400' : 'bg-amber-400'
                       }`}
                     />
-                    {workload.ready_replicas}/{workload.replicas} Ready
+                    {workload.ready_replicas}/{workload.replicas}
                   </span>
                 </div>
 
-                {/* Progress replica visual */}
-                <div className="w-full bg-slate-800/60 h-1.5 rounded-full overflow-hidden mb-4">
+                {/* Progress bar */}
+                <div className="w-full bg-[#21262D] h-1 rounded-full overflow-hidden mb-3">
                   <div
-                    className={`h-full rounded-full transition-all ${
-                      workload.is_ready ? 'bg-emerald-500' : 'bg-amber-500'
-                    }`}
+                    className={`h-full ${workload.is_ready ? 'bg-emerald-500' : 'bg-amber-500'}`}
                     style={{
                       width: `${(workload.ready_replicas / workload.replicas) * 100}%`,
                     }}
@@ -393,35 +382,32 @@ export const InfrastructureView: React.FC = () => {
                 </div>
 
                 {/* Labels tags */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300">
-                    Selector Labels:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
+                <div className="space-y-1 mb-3">
+                  <div className="flex flex-wrap gap-1">
                     {Object.entries(workload.labels).map(([k, v]) => (
                       <span
                         key={k}
-                        className="px-2 py-0.5 rounded-md bg-[#090D16] border border-slate-800 text-[10px] font-mono text-slate-300"
+                        className="px-1.5 py-0.5 rounded bg-[#0D1117] border border-[#21262D] text-[10px] font-mono text-slate-400"
                       >
-                        {k}: <span className="text-slate-200">{v}</span>
+                        {k}={v}
                       </span>
                     ))}
                   </div>
                 </div>
 
-                {/* Action CTA */}
-                <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-mono text-[11px]">Chaos Target</span>
+                {/* Action CTA: Serious Red button without AI glow */}
+                <div className="pt-2.5 border-t border-[#21262D] flex items-center justify-between">
+                  <span className="text-slate-500 font-mono text-[11px]">Ready for Fault</span>
                   <button
                     onClick={() => {
                       alert(
                         `Target "${workload.name}" selected. Proceed to PB-06b Experiment Definition.`
                       );
                     }}
-                    className="inline-flex items-center gap-1 font-medium text-amber-400 hover:text-amber-300 transition-colors"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
                   >
-                    <span>Configure Chaos</span>
-                    <Zap className="w-3.5 h-3.5" />
+                    <span>Inject Chaos</span>
+                    <Zap className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -433,67 +419,38 @@ export const InfrastructureView: React.FC = () => {
       {/* Discovered Services Grid */}
       {(activeTab === 'all' || activeTab === 'services') && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold tracking-wider uppercase text-slate-300 font-mono flex items-center gap-2">
-              <Server className="w-4 h-4 text-blue-400" />
-              Service Networking ({filteredServices.length})
-            </h3>
-          </div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono flex items-center gap-2 mb-3">
+            <Server className="w-3.5 h-3.5 text-slate-400" />
+            Service Endpoints ({filteredServices.length})
+          </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredServices.map((service) => (
               <div
                 key={service.name}
-                className="bg-[#0E1422]/90 border border-slate-800/90 rounded-2xl p-5 hover:border-slate-700 transition-all hover:shadow-xl hover:shadow-black/50 group"
+                className="bg-[#161B22] border border-[#30363D] rounded p-4"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-mono text-xs font-bold">
-                      {service.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-100 group-hover:text-blue-300 transition-colors">
-                        {service.name}
-                      </h4>
-                      <span className="text-[11px] font-mono text-slate-300">{service.type}</span>
-                    </div>
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-100 font-mono">{service.name}</h4>
+                    <span className="text-[11px] text-slate-400">{service.type}</span>
                   </div>
 
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <span className="text-[11px] font-mono text-slate-400 bg-[#0D1117] px-2 py-0.5 rounded border border-[#21262D]">
                     {service.cluster_ip || 'None'}
                   </span>
                 </div>
 
                 {/* Ports */}
-                <div className="mb-3 space-y-1">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300">
-                    Exposed Ports:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase">Ports:</span>
+                  <div className="flex flex-wrap gap-1">
                     {service.ports.map((p, idx) => (
                       <span
                         key={idx}
-                        className="px-2 py-0.5 rounded-md bg-[#090D16] border border-slate-800 text-[11px] font-mono text-slate-300"
+                        className="px-1.5 py-0.5 rounded bg-[#0D1117] border border-[#21262D] text-[10px] font-mono text-slate-300"
                       >
-                        <span className="text-blue-400">{p.port}</span>:{p.target_port}/
-                        {p.protocol}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Selector */}
-                <div className="space-y-1">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300">
-                    Selector:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(service.selector).map(([k, v]) => (
-                      <span
-                        key={k}
-                        className="px-2 py-0.5 rounded-md bg-[#090D16] border border-slate-800 text-[10px] font-mono text-slate-300"
-                      >
-                        {k}={v}
+                        {p.port}:{p.target_port}/{p.protocol}
                       </span>
                     ))}
                   </div>

@@ -12,13 +12,13 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans selection:bg-amber-500/20 selection:text-amber-300">
+    <div className="min-h-screen bg-[#0D1117] text-[#E6EDF3] flex flex-col font-sans">
       <Navbar />
       <main className="flex-1">
         <InfrastructureView />
       </main>
-      <footer className="border-t border-slate-800/80 py-6 px-6 text-center text-xs text-slate-300 font-mono">
-        Hypo • Chaos & Resilience Automation Engine • Capstone TI
+      <footer className="border-t border-[#21262D] py-4 px-6 text-center text-xs text-slate-500 font-mono">
+        Hypo Control Plane • Chaos & Resilience Automation
       </footer>
     </div>
   );
