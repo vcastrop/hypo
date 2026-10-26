@@ -1,4 +1,9 @@
-import type { NamespaceInfo, ServiceInfo, WorkloadInfo } from '../types/discovery';
+import type {
+  NamespaceInfo,
+  ServiceInfo,
+  WorkloadInfo,
+  WorkloadApiResponse,
+} from '../types/discovery';
 
 const BASE_URL = '/api/v1';
 
@@ -18,10 +23,27 @@ export async function fetchServices(namespace: string): Promise<ServiceInfo[]> {
   return res.json();
 }
 
-export async function fetchWorkloads(namespace: string): Promise<WorkloadInfo[]> {
-  const res = await fetch(`${BASE_URL}/discovery/namespaces/${encodeURIComponent(namespace)}/workloads`);
+export async function fetchWorkloads(
+  namespace: string
+): Promise<WorkloadInfo[]> {
+  const res = await fetch(
+    `${BASE_URL}/discovery/namespaces/${encodeURIComponent(namespace)}/workloads`
+  );
+
   if (!res.ok) {
     throw new Error(`Failed to fetch workloads: ${res.statusText}`);
   }
-  return res.json();
+
+  const data: WorkloadApiResponse[] = await res.json();
+
+  return data.map((workload) => ({
+    name: workload.name,
+    namespace: workload.namespace,
+    kind: workload.kind,
+    replicas: workload.replicas_desired,
+    ready_replicas: workload.replicas_ready,
+    available_replicas: workload.replicas_ready,
+    labels: workload.labels,
+    is_ready: workload.replicas_ready === workload.replicas_desired,
+  }));
 }

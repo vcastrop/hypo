@@ -30,3 +30,12 @@ export interface WorkloadInfo {
   labels: Record<string, string>;
   is_ready: boolean;
 }
+
+export interface WorkloadApiResponse {
+  name: string;
+  namespace: string;
+  kind: 'Deployment' | 'StatefulSet';
+  replicas_desired: number;
+  replicas_ready: number;
+  labels: Record<string, string>;
+}
