@@ -268,15 +268,19 @@ class FakeChaosClient:
 
 
 class FakePrometheusClient:
-    def __init__(self, error_rate=0.0, success_rate=100.0):
+    def __init__(self, error_rate=0.0, success_rate=100.0, p95_latency_ms=50.0):
         self.error_rate = error_rate
         self.success_rate = success_rate
+        self.p95_latency_ms = p95_latency_ms
 
     def get_error_rate(self, service_name, window="1m"):
         return self.error_rate
 
     def get_success_rate(self, service_name, window="1m"):
         return self.success_rate
+
+    def get_p95_latency(self, service_name, window="1m"):
+        return self.p95_latency_ms
 
     def query(self, query):
         return None

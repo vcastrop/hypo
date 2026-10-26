@@ -41,6 +41,22 @@ export interface MetricSample {
   value: number;
 }
 
+export interface WindowMetrics {
+  error_rate: number | null;
+  success_rate: number | null;
+  p95_latency_ms: number | null;
+}
+
+export interface ExperimentEvaluation {
+  verdict: 'PASS' | 'FAIL';
+  hypothesis_met: boolean;
+  recovery_time_seconds: number | null;
+  before_metrics: WindowMetrics;
+  during_metrics: WindowMetrics;
+  after_metrics: WindowMetrics;
+  details: string[];
+}
+
 export interface ExperimentRunResult {
   id: string;
   experiment: ExperimentDefinition;
@@ -51,6 +67,7 @@ export interface ExperimentRunResult {
   metrics_observed: MetricSample[];
   started_at: string | null;
   ended_at: string | null;
+  evaluation: ExperimentEvaluation | null;
 }
 
 export interface AbortCondition {

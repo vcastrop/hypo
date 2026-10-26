@@ -9,7 +9,9 @@ from datetime import UTC, datetime
 import yaml
 
 from app.integrations.chaos_mesh import ChaosMeshClient
+from app.integrations.kubernetes import get_deployment_replica_status
 from app.integrations.prometheus import PrometheusClient
+from app.modules.experiments.recovery import measure_deployment_recovery
 from app.modules.experiments.schemas import (
     ExperimentDefinitionRequest,
     ExperimentRunRequest,
@@ -52,7 +54,6 @@ class ExperimentRunner:
             )
 
         # Revalidate supplied definitions instead of trusting client values.
-        from app.modules.experiments.schemas import ExperimentDefinitionRequest
 
         experiment = define_experiment(
             ExperimentDefinitionRequest(
@@ -189,6 +190,12 @@ class ExperimentRunner:
         before_metrics = None
         during_metrics = None
         after_metrics = None
+        recovery_time_seconds = None
+        chaos_applied = False
+        recovery_thread = None
+        recovery_stop = threading.Event()
+        recovery_ready = threading.Event()
+        recovery_result = {"seconds": None}
 
         final_status = ExperimentStatus.COMPLETED
         abort_reason = None
@@ -213,8 +220,41 @@ class ExperimentRunner:
 
             logger.info("Applying experiment %s", run_id)
 
+            if experiment.failure_type.value == "pod-kill":
+                def observe_recovery():
+                    try:
+                        recovery_result["seconds"] = measure_deployment_recovery(
+                            get_replica_status=lambda: get_deployment_replica_status(
+                                namespace=experiment.target.namespace,
+                                deployment_name=experiment.target.name,
+                            ),
+                            timeout_seconds=duration + 60.0,
+                            stop_event=recovery_stop,
+                            ready_event=recovery_ready,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Kubernetes recovery monitoring failed for %s",
+                            run_id,
+                        )
+
+                recovery_thread = threading.Thread(
+                    target=observe_recovery,
+                    daemon=True,
+                    name=f"recovery-{run_id}",
+                )
+                recovery_thread.start()
+
+                if not recovery_ready.wait(timeout=2.0):
+                    recovery_stop.set()
+                    raise RuntimeError(
+                        "Kubernetes recovery observer was not ready "
+                        "before chaos injection"
+                    )
+
             # Attempt cleanup even if the apply operation raises.
             chaos_client.apply_experiment(manifest)
+            chaos_applied = True
 
             deadline = time.monotonic() + duration
 
@@ -261,7 +301,16 @@ class ExperimentRunner:
             abort_reason = str(exc)
 
         finally:
-            # Cleanup takes priority over metric collection.
+            # Capture metrics while the chaos resource is still active.
+            try:
+                during_metrics = pull_window_metrics(
+                    experiment.target.name,
+                    prometheus_client,
+                )
+            except Exception:
+                logger.exception("Could not collect during-chaos metrics for %s", run_id)
+
+            # Always remove the chaos resource, even if metric collection fails.
             try:
                 chaos_client.delete_experiment(
                     kind=kind,
@@ -274,17 +323,43 @@ class ExperimentRunner:
                 final_status = ExperimentStatus.FAILED
                 abort_reason = f"Chaos cleanup failed: {exc}"
 
+            # Wait for observed recovery before publishing final results.
+            if recovery_thread is not None:
+                if (
+                    chaos_applied
+                    and cleanup_error is None
+                    and not cancel_event.is_set()
+                ):
+                    recovery_deadline = time.monotonic() + 60.0
+
+                    while (
+                        recovery_thread.is_alive()
+                        and time.monotonic() < recovery_deadline
+                        and not cancel_event.is_set()
+                    ):
+                        remaining = recovery_deadline - time.monotonic()
+                        recovery_thread.join(
+                            timeout=min(0.1, max(0.0, remaining))
+                        )
+
+                recovery_stop.set()
+                recovery_thread.join(timeout=0.5)
+
+                if not recovery_thread.is_alive():
+                    recovery_time_seconds = recovery_result["seconds"]
+                else:
+                    logger.warning(
+                        "Recovery observer did not stop for %s",
+                        run_id,
+                    )
+
             try:
-                during_metrics = pull_window_metrics(
-                    experiment.target.name,
-                    prometheus_client,
-                )
                 after_metrics = pull_window_metrics(
                     experiment.target.name,
                     prometheus_client,
                 )
             except Exception:
-                logger.exception("Could not collect final metrics for %s", run_id)
+                logger.exception("Could not collect post-chaos metrics for %s", run_id)
 
             evaluation = None
 
@@ -304,6 +379,7 @@ class ExperimentRunner:
                         before_metrics=before_metrics,
                         during_metrics=during_metrics,
                         after_metrics=after_metrics,
+                        recovery_time_seconds=recovery_time_seconds,
                     )
                 except Exception:
                     logger.exception("Evaluation failed for %s", run_id)

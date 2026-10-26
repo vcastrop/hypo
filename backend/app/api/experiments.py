@@ -11,6 +11,7 @@ from app.core.errors import (
 from app.integrations.chaos_mesh import get_chaos_mesh_client
 from app.integrations.kubernetes import K8sClients, get_k8s_clients
 from app.integrations.prometheus import PrometheusClient, get_prometheus_client
+from app.modules.experiments.runner import experiment_runner
 from app.modules.experiments.schemas import (
     ExperimentDefinition,
     ExperimentDefinitionRequest,
@@ -18,7 +19,6 @@ from app.modules.experiments.schemas import (
     ExperimentRunResult,
     ExperimentYamlResponse,
 )
-from app.modules.experiments.runner import experiment_runner
 from app.modules.experiments.service import (
     define_experiment,
     execute_experiment,

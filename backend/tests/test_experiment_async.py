@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pytest
 
 from app.modules.experiments.runner import ExperimentRunner
@@ -117,8 +120,6 @@ def test_register_generates_unique_chaos_resource_names():
     assert first_manifest["metadata"]["annotations"]["hypo/run-id"] == first.id
     assert second_manifest["metadata"]["annotations"]["hypo/run-id"] == second.id
 
-import time
-import threading
 
 
 class FakeChaosClient:
@@ -170,11 +171,31 @@ def test_async_experiment_completes_and_cleans_up():
         }
     )
 
-    result = runner.start(request, chaos)
+    from unittest.mock import patch
 
-    assert result.status == ExperimentStatus.PENDING
+    def fake_recovery(
+        get_replica_status,
+        timeout_seconds=60.0,
+        poll_interval_seconds=1.0,
+        stop_event=None,
+        ready_event=None,
+    ):
+        if ready_event is not None:
+            ready_event.set()
+        return 0.25
 
-    finished = wait_for_terminal_status(runner, result.id)
+    with patch(
+        "app.modules.experiments.runner.measure_deployment_recovery",
+        side_effect=fake_recovery,
+    ):
+        result = runner.start(request, chaos)
+
+        assert result.status in (
+            ExperimentStatus.PENDING,
+            ExperimentStatus.RUNNING,
+        )
+
+        finished = wait_for_terminal_status(runner, result.id)
 
     assert finished.status == ExperimentStatus.COMPLETED
     assert finished.started_at is not None
@@ -236,7 +257,6 @@ def test_async_experiment_handles_apply_failure():
     # Cleanup must be attempted even after an injection error.
     assert len(chaos.deleted) == 1
 
-import pytest
 
 
 def test_register_rejects_excessive_duration():
