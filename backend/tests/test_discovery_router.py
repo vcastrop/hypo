@@ -21,8 +21,11 @@ def _ns(name, phase="Active"):
 
 def _workload(name, replicas, ready, kind="Deployment"):
     return NS(
-        metadata=NS(name=name, labels={"app": name}),
-        spec=NS(replicas=replicas),
+        metadata=NS(name=name, labels={"environment": "test"}),
+        spec=NS(
+            replicas=replicas,
+            selector=NS(match_labels={"app": name}),
+        ),
         status=NS(ready_replicas=ready),
     )
 

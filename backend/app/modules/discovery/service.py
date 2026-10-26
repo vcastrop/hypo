@@ -64,10 +64,9 @@ def _to_workload(obj, namespace: str, kind: str) -> WorkloadInfo:
         namespace=namespace,
         kind=kind,
         replicas_desired=obj.spec.replicas if obj.spec.replicas is not None else 1,
-        replicas_ready=obj.status.ready_replicas or 0,  # None when no pod is ready
-        labels=obj.metadata.labels or {},
+        replicas_ready=obj.status.ready_replicas or 0,
+        labels=obj.spec.selector.match_labels or {},
     )
-
 
 def list_workloads(clients: K8sClients, namespace: str) -> list[WorkloadInfo]:
     _ensure_namespace(clients, namespace)

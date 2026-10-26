@@ -18,6 +18,7 @@ from app.modules.experiments.schemas import (
     ExperimentRunResult,
     ExperimentYamlResponse,
 )
+from app.modules.experiments.runner import experiment_runner
 from app.modules.experiments.service import (
     define_experiment,
     execute_experiment,
@@ -114,6 +115,47 @@ def run_experiment(
     except ClusterError as exc:
         raise _handle_cluster_error(exc) from exc
 
+@router.post(
+    "/runs/async",
+    response_model=ExperimentRunResult,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Start an experiment asynchronously",
+)
+def start_experiment_async(
+    request: ExperimentRunRequest,
+    clients: Annotated[K8sClients, Depends(get_k8s_clients)],
+    prometheus_client: Annotated[
+        PrometheusClient,
+        Depends(get_prometheus_client),
+    ],
+) -> ExperimentRunResult:
+    """Register an experiment and execute it in a background thread."""
+
+    chaos_client = get_chaos_mesh_client(clients)
+
+    try:
+        return experiment_runner.start(
+            request=request,
+            chaos_client=chaos_client,
+            prometheus_client=prometheus_client,
+        )
+
+    except ValueError as exc:
+        message = str(exc)
+
+        if "already active" in message:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=message,
+            ) from exc
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=message,
+        ) from exc
+
+    except ClusterError as exc:
+        raise _handle_cluster_error(exc) from exc
 
 @router.get(
     "/runs",
@@ -137,3 +179,22 @@ def get_experiment_run(run_id: str) -> ExperimentRunResult:
             detail=f"Experiment run '{run_id}' not found",
         )
     return run
+
+@router.post(
+    "/runs/{run_id}/stop",
+    response_model=ExperimentRunResult,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Request cancellation of an experiment",
+)
+def stop_experiment_async(run_id: str) -> ExperimentRunResult:
+    """Request cancellation without blocking the HTTP response."""
+
+    result = experiment_runner.request_stop(run_id)
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Experiment run '{run_id}' not found",
+        )
+
+    return result

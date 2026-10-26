@@ -18,8 +18,11 @@ def _ns(name, phase="Active"):
 
 def _workload(name, replicas, ready):
     return NS(
-        metadata=NS(name=name, labels={"app": name}),
-        spec=NS(replicas=replicas),
+        metadata=NS(name=name, labels={"environment": "test"}),
+        spec=NS(
+            replicas=replicas,
+            selector=NS(match_labels={"app": name}),
+        ),
         status=NS(ready_replicas=ready),
     )
 
@@ -86,6 +89,18 @@ def test_list_workloads_includes_both_kinds_and_handles_none_ready():
     assert by_name["cart"].replicas_ready == 0
     assert by_name["catalog-service"].replicas_desired == 2
     assert by_name["db"].kind == "StatefulSet"
+
+def test_workload_uses_pod_selector_not_metadata_labels():
+    workloads = service.list_workloads(_clients(), "mybookstore")
+
+    catalog = next(
+        workload
+        for workload in workloads
+        if workload.name == "catalog-service"
+    )
+
+    assert catalog.labels == {"app": "catalog-service"}
+    assert catalog.labels != {"environment": "test"}
 
 
 def test_missing_namespace_raises_not_found():

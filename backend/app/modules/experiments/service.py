@@ -104,9 +104,17 @@ def generate_chaos_mesh_manifest(experiment: ExperimentDefinition) -> dict[str, 
     """Convert an ExperimentDefinition into a Chaos Mesh custom resource specification."""
     target_name = experiment.target.name
     namespace = experiment.target.namespace
-    labels = experiment.target.labels or {"app": target_name}
-    affected = getattr(experiment, "affected_replicas", 1)
-    mode = "one" if affected <= 1 else "fixed"
+
+    labels = experiment.target.labels
+
+    if not labels:
+        raise ValueError(
+            f"Cannot generate a Chaos Mesh manifest for '{target_name}': "
+            "the target must have a non-empty Kubernetes pod selector."
+        )
+
+    affected = experiment.affected_replicas
+    mode = "one" if affected == 1 else "fixed"
     duration_str = f"{experiment.duration_seconds}s"
 
     if experiment.failure_type == FailureType.POD_KILL:
