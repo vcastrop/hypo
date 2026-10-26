@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 import yaml
 
 from app.integrations.chaos_mesh import ChaosMeshClient
-from app.integrations.prometheus import PrometheusClient
 from app.integrations.kubernetes import get_deployment_replica_status
+from app.integrations.prometheus import PrometheusClient
 from app.modules.experiments.recovery import measure_deployment_recovery
 from app.modules.experiments.schemas import (
     ExperimentDefinitionRequest,
@@ -54,7 +54,6 @@ class ExperimentRunner:
             )
 
         # Revalidate supplied definitions instead of trusting client values.
-        from app.modules.experiments.schemas import ExperimentDefinitionRequest
 
         experiment = define_experiment(
             ExperimentDefinitionRequest(

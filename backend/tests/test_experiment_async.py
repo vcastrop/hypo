@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pytest
 
 from app.modules.experiments.runner import ExperimentRunner
@@ -117,8 +120,6 @@ def test_register_generates_unique_chaos_resource_names():
     assert first_manifest["metadata"]["annotations"]["hypo/run-id"] == first.id
     assert second_manifest["metadata"]["annotations"]["hypo/run-id"] == second.id
 
-import time
-import threading
 
 
 class FakeChaosClient:
@@ -256,7 +257,6 @@ def test_async_experiment_handles_apply_failure():
     # Cleanup must be attempted even after an injection error.
     assert len(chaos.deleted) == 1
 
-import pytest
 
 
 def test_register_rejects_excessive_duration():

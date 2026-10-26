@@ -1,12 +1,10 @@
-import threading
 """Integration tests for Kubernetes recovery monitoring in the runner."""
-
+import threading
 import time
 from unittest.mock import patch
 
 from app.modules.experiments.runner import ExperimentRunner
 from app.modules.experiments.schemas import ExperimentStatus
-
 from tests.test_experiment_async import FakeChaosClient, make_request
 
 
