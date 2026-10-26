@@ -250,12 +250,29 @@ def test_async_run_endpoint_completes():
             "max_duration_seconds": 0.05,
         }
 
-        response = client.post(
-            "/api/v1/experiments/runs/async",
-            json=payload,
-        )
+        from unittest.mock import patch
 
-        assert response.status_code == 202
+        def fake_recovery(
+            get_replica_status,
+            timeout_seconds=60.0,
+            poll_interval_seconds=1.0,
+            stop_event=None,
+            ready_event=None,
+        ):
+            if ready_event is not None:
+                ready_event.set()
+            return 0.25
+
+        with patch(
+            "app.modules.experiments.runner.measure_deployment_recovery",
+            side_effect=fake_recovery,
+        ):
+            response = client.post(
+                "/api/v1/experiments/runs/async",
+                json=payload,
+            )
+
+            assert response.status_code == 202
 
         run_id = response.json()["id"]
         assert run_id.startswith("run-")

@@ -170,11 +170,31 @@ def test_async_experiment_completes_and_cleans_up():
         }
     )
 
-    result = runner.start(request, chaos)
+    from unittest.mock import patch
 
-    assert result.status == ExperimentStatus.PENDING
+    def fake_recovery(
+        get_replica_status,
+        timeout_seconds=60.0,
+        poll_interval_seconds=1.0,
+        stop_event=None,
+        ready_event=None,
+    ):
+        if ready_event is not None:
+            ready_event.set()
+        return 0.25
 
-    finished = wait_for_terminal_status(runner, result.id)
+    with patch(
+        "app.modules.experiments.runner.measure_deployment_recovery",
+        side_effect=fake_recovery,
+    ):
+        result = runner.start(request, chaos)
+
+        assert result.status in (
+            ExperimentStatus.PENDING,
+            ExperimentStatus.RUNNING,
+        )
+
+        finished = wait_for_terminal_status(runner, result.id)
 
     assert finished.status == ExperimentStatus.COMPLETED
     assert finished.started_at is not None

@@ -84,3 +84,22 @@ def translate_k8s_errors() -> Iterator[None]:
         raise ClusterError(f"Kubernetes API error {exc.status}: {exc.reason}") from exc
     except (urllib3.exceptions.HTTPError, OSError) as exc:
         raise ClusterUnreachableError("Kubernetes API is unreachable") from exc
+
+
+def get_deployment_replica_status(
+    namespace: str,
+    deployment_name: str,
+) -> tuple[int, int]:
+    """Return desired and available replicas for a Kubernetes Deployment."""
+    clients = get_k8s_clients()
+
+    with translate_k8s_errors():
+        deployment = clients.apps_v1.read_namespaced_deployment(
+            name=deployment_name,
+            namespace=namespace,
+        )
+
+    desired = deployment.spec.replicas
+    available = deployment.status.available_replicas or 0
+
+    return desired, available

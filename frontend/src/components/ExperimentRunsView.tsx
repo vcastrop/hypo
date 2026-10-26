@@ -1,3 +1,4 @@
+import { ExperimentResultCard } from './ExperimentResultCard';
 import React, { useEffect, useState } from 'react';
 import {
   Activity,
@@ -239,6 +240,10 @@ export const ExperimentRunsView: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {['completed', 'aborted', 'failed'].includes(run.status) && (
+                <ExperimentResultCard evaluation={run.evaluation} />
+              )}
 
               {run.abort_triggered && (
                 <div className="flex gap-2 mt-5 rounded-lg border border-amber-800/50 bg-amber-950/20 p-4 text-sm text-amber-300">

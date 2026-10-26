@@ -341,9 +341,33 @@ def evaluate_experiment(
     details: list[str] = []
     passed = True
 
+    if status != ExperimentStatus.COMPLETED:
+        passed = False
+        details.append(
+            f"Experiment did not complete successfully "
+            f"(status={status.value}): {abort_reason or 'No reason provided'}"
+        )
+
     if abort_triggered or status == ExperimentStatus.ABORTED:
         passed = False
-        details.append(f"Experiment aborted prematurely due to safety condition: {abort_reason}")
+        details.append(
+            "Experiment aborted prematurely due to safety condition: "
+            f"{abort_reason or 'No reason provided'}"
+        )
+
+    # Missing post-chaos evidence must never produce a PASS.
+    if (
+        after_metrics.error_rate is None
+        or after_metrics.success_rate is None
+        or (
+            criteria.max_p95_latency_ms is not None
+            and after_metrics.p95_latency_ms is None
+        )
+    ):
+        passed = False
+        details.append(
+            "Insufficient post-chaos metrics to verify all configured SLOs"
+        )
 
     # Evaluate after metrics (steady state recovery)
     if after_metrics.error_rate is not None:
@@ -385,8 +409,13 @@ def evaluate_experiment(
                 f"met SLO threshold (<={criteria.max_p95_latency_ms:.1f}ms)"
             )
 
-    if criteria.max_recovery_time_seconds is not None and recovery_time_seconds is not None:
-        if recovery_time_seconds > criteria.max_recovery_time_seconds:
+    if criteria.max_recovery_time_seconds is not None:
+        if recovery_time_seconds is None:
+            passed = False
+            details.append(
+                "Recovery could not be verified: no recovery time was observed"
+            )
+        elif recovery_time_seconds > criteria.max_recovery_time_seconds:
             passed = False
             details.append(
                 f"Recovery time ({recovery_time_seconds:.1f}s) "
