@@ -8,7 +8,11 @@ import {
   FlaskConical,
 } from 'lucide-react';
 
-import { fetchExperimentRuns } from '../services/experiments';
+import {
+  fetchExperimentRuns,
+  stopExperiment,
+} from '../services/experiments';
+
 import type {
   ExperimentRunResult,
   ExperimentStatus,
@@ -34,6 +38,7 @@ export const ExperimentRunsView: React.FC = () => {
   const [runs, setRuns] = useState<ExperimentRunResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stoppingRunId, setStoppingRunId] = useState<string | null>(null);
 
   const loadRuns = async () => {
     setLoading(true);
@@ -56,13 +61,15 @@ export const ExperimentRunsView: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
 
-    fetchExperimentRuns()
-        .then((data) => {
+    const refreshRuns = async () => {
+        try {
+        const data = await fetchExperimentRuns();
+
         if (!cancelled) {
             setRuns(data);
+            setError(null);
         }
-        })
-        .catch((err) => {
+        } catch (err) {
         if (!cancelled) {
             setError(
             err instanceof Error
@@ -70,17 +77,53 @@ export const ExperimentRunsView: React.FC = () => {
                 : 'No fue posible consultar las ejecuciones.'
             );
         }
-        })
-        .finally(() => {
+        } finally {
         if (!cancelled) {
             setLoading(false);
         }
-        });
+        }
+    };
+
+    void refreshRuns();
+
+    const interval = window.setInterval(() => {
+        void refreshRuns();
+    }, 2000);
 
     return () => {
         cancelled = true;
+        window.clearInterval(interval);
     };
   }, []);
+
+  const handleStopExperiment = async (runId: string) => {
+    if (stoppingRunId) return;
+
+    const confirmed = window.confirm(
+        '¿Deseas detener este experimento? Se solicitará la eliminación del fallo inyectado.'
+    );
+
+    if (!confirmed) return;
+
+    setStoppingRunId(runId);
+    setError(null);
+
+    try {
+        await stopExperiment(runId);
+
+        // Consultar nuevamente el historial.
+        const updatedRuns = await fetchExperimentRuns();
+        setRuns(updatedRuns);
+    } catch (err) {
+        setError(
+        err instanceof Error
+            ? err.message
+            : 'No fue posible detener el experimento.'
+        );
+    } finally {
+        setStoppingRunId(null);
+    }
+  };
 
   return (
     <section className="max-w-7xl mx-auto px-8 pb-12">
@@ -217,6 +260,28 @@ export const ExperimentRunsView: React.FC = () => {
                 <div className="flex items-center gap-2 mt-5 text-sm text-blue-400">
                   <Clock className="w-4 h-4" />
                   Experimento en ejecución
+                </div>
+              )}
+              {(run.status === 'pending' || run.status === 'running') && (
+                <div className="mt-5 pt-4 border-t border-[#333333]">
+                    <button
+                    type="button"
+                    onClick={() => void handleStopExperiment(run.id)}
+                    disabled={stoppingRunId !== null}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-700 bg-red-950/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    >
+                    {stoppingRunId === run.id ? (
+                        <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Solicitando cancelación...
+                        </>
+                    ) : (
+                        <>
+                        <AlertCircle className="w-4 h-4" />
+                        Stop Experiment
+                        </>
+                    )}
+                    </button>
                 </div>
               )}
             </article>

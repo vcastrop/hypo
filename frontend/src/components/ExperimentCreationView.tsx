@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { FlaskConical, ShieldCheck, AlertTriangle, RefreshCw } from 'lucide-react';
 
 import { fetchNamespaces, fetchWorkloads } from '../services/api';
-import { createExperimentDefinition } from '../services/experiments';
+import {
+  createExperimentDefinition,
+  startExperiment,
+} from '../services/experiments';
 
 import type { NamespaceInfo, WorkloadInfo } from '../types/discovery';
 import type {
   ExperimentDefinition,
+  ExperimentRunResult,
   FailureType,
 } from '../types/experiments';
 
@@ -32,6 +36,11 @@ export const ExperimentCreationView: React.FC = () => {
   const [loadingWorkloads, setLoadingWorkloads] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [definition, setDefinition] = useState<ExperimentDefinition | null>(null);
+
+  const [executing, setExecuting] = useState(false);
+
+  const [activeRun, setActiveRun] =
+    useState<ExperimentRunResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +157,39 @@ export const ExperimentCreationView: React.FC = () => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRunExperiment = async () => {
+    if (!definition || executing || activeRun) return;
+
+    setExecuting(true);
+    setError(null);
+
+    try {
+        const result = await startExperiment({
+        definition,
+        abort_condition: {
+            metric: 'error_rate',
+            threshold: 10,
+            operator: '>',
+        },
+        monitor_interval_seconds: 2,
+        max_duration_seconds: Math.min(
+            definition.duration_seconds,
+            300
+        ),
+        });
+
+        setActiveRun(result);
+    } catch (err) {
+        setError(
+        err instanceof Error
+            ? err.message
+            : 'No fue posible iniciar el experimento.'
+        );
+    } finally {
+        setExecuting(false);
     }
   };
 
@@ -326,6 +368,50 @@ export const ExperimentCreationView: React.FC = () => {
 
         <aside className="rounded-xl border border-[#333333] bg-[#1e1e1e] p-6 h-fit">
           <h2 className="text-lg font-semibold mb-4">Resumen</h2>
+            <p className="text-xs text-slate-400">
+                Blast radius validado: {definition?.blast_radius_percentage ?? 0}%
+            </p>
+
+            <button
+            type="button"
+            onClick={() => void handleRunExperiment()}
+            disabled={executing || activeRun !== null}
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-colors cursor-pointer"
+            >
+            {executing ? (
+                <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Iniciando experimento...
+                </>
+            ) : activeRun ? (
+                'Experimento iniciado'
+            ) : (
+                <>
+                <FlaskConical className="w-4 h-4" />
+                Run Experiment
+                </>
+            )}
+            </button>
+
+            {activeRun && (
+            <div className="rounded-lg border border-blue-800/50 bg-blue-950/20 p-4">
+                <p className="text-sm font-semibold text-blue-300">
+                Solicitud de ejecución aceptada
+                </p>
+
+                <p className="text-xs text-slate-400 mt-2">
+                ID de ejecución:
+                </p>
+
+                <p className="text-xs font-mono text-white break-all mt-1">
+                {activeRun.id}
+                </p>
+
+                <p className="text-xs text-slate-400 mt-3">
+                Estado inicial: {activeRun.status}
+                </p>
+            </div>
+            )}
 
           <div className="space-y-4 text-sm">
             <div>

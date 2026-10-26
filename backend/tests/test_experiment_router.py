@@ -221,3 +221,203 @@ def test_run_experiment_triggers_abort_on_breach():
 def test_get_nonexistent_run_returns_404():
     response = client.get("/api/v1/experiments/runs/run-doesnotexist")
     assert response.status_code == 404
+
+def test_async_run_endpoint_completes():
+    import time
+
+    from app.integrations.kubernetes import K8sClients, get_k8s_clients
+    from app.integrations.prometheus import get_prometheus_client
+
+    fake_k8s = K8sClients(
+        core_v1=None,
+        apps_v1=None,
+        custom_objects=FakeCustomObjectsApi(),
+    )
+    fake_prom = FakePrometheus(error_rate=1.0)
+
+    app.dependency_overrides[get_k8s_clients] = lambda: fake_k8s
+    app.dependency_overrides[get_prometheus_client] = lambda: fake_prom
+
+    try:
+        payload = {
+            "definition_request": _payload(),
+            "abort_condition": {
+                "metric": "error_rate",
+                "threshold": 10.0,
+                "operator": ">",
+            },
+            "monitor_interval_seconds": 0.01,
+            "max_duration_seconds": 0.05,
+        }
+
+        response = client.post(
+            "/api/v1/experiments/runs/async",
+            json=payload,
+        )
+
+        assert response.status_code == 202
+
+        run_id = response.json()["id"]
+        assert run_id.startswith("run-")
+
+        deadline = time.monotonic() + 3
+
+        while time.monotonic() < deadline:
+            result = client.get(
+                f"/api/v1/experiments/runs/{run_id}"
+            )
+
+            assert result.status_code == 200
+
+            if result.json()["status"] in (
+                "completed",
+                "aborted",
+                "failed",
+            ):
+                break
+
+            time.sleep(0.01)
+        else:
+            raise AssertionError("Async experiment timed out")
+
+        assert result.json()["status"] == "completed"
+        assert len(fake_k8s.custom_objects.created) == 1
+        assert len(fake_k8s.custom_objects.deleted) == 1
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_async_stop_nonexistent_run_returns_404():
+    response = client.post(
+        "/api/v1/experiments/runs/run-doesnotexist/stop"
+    )
+
+    assert response.status_code == 404
+
+
+def test_async_run_rejects_excessive_duration():
+    from app.integrations.kubernetes import K8sClients, get_k8s_clients
+    from app.integrations.prometheus import get_prometheus_client
+
+    fake_k8s = K8sClients(
+        core_v1=None,
+        apps_v1=None,
+        custom_objects=FakeCustomObjectsApi(),
+    )
+
+    app.dependency_overrides[get_k8s_clients] = lambda: fake_k8s
+    app.dependency_overrides[get_prometheus_client] = lambda: FakePrometheus()
+
+    try:
+        payload = {
+            "definition_request": {
+                **_payload(),
+                "duration_seconds": 301,
+            },
+            "abort_condition": {
+                "metric": "error_rate",
+                "threshold": 10.0,
+                "operator": ">",
+            },
+            "monitor_interval_seconds": 0.01,
+        }
+
+        response = client.post(
+            "/api/v1/experiments/runs/async",
+            json=payload,
+        )
+
+        assert response.status_code == 422
+        assert "cannot exceed" in response.json()["detail"]
+
+        assert len(fake_k8s.custom_objects.created) == 0
+
+    finally:
+        app.dependency_overrides.clear()
+
+def test_async_stop_active_experiment():
+    import time
+
+    from app.integrations.kubernetes import K8sClients, get_k8s_clients
+    from app.integrations.prometheus import get_prometheus_client
+
+    fake_k8s = K8sClients(
+        core_v1=None,
+        apps_v1=None,
+        custom_objects=FakeCustomObjectsApi(),
+    )
+
+    fake_prom = FakePrometheus(error_rate=1.0)
+
+    app.dependency_overrides[get_k8s_clients] = lambda: fake_k8s
+    app.dependency_overrides[get_prometheus_client] = lambda: fake_prom
+
+    try:
+        payload = {
+            "definition_request": _payload(),
+            "abort_condition": {
+                "metric": "error_rate",
+                "threshold": 10.0,
+                "operator": ">",
+            },
+            "monitor_interval_seconds": 0.01,
+            "max_duration_seconds": 5.0,
+        }
+
+        # 1. Start the experiment.
+        response = client.post(
+            "/api/v1/experiments/runs/async",
+            json=payload,
+        )
+
+        assert response.status_code == 202
+
+        run_id = response.json()["id"]
+
+        # 2. Wait until Chaos Mesh receives the resource.
+        deadline = time.monotonic() + 3
+
+        while time.monotonic() < deadline:
+            if fake_k8s.custom_objects.created:
+                break
+
+            time.sleep(0.01)
+        else:
+            raise AssertionError("Chaos resource was not created")
+
+        # 3. Request cancellation through HTTP.
+        stop_response = client.post(
+            f"/api/v1/experiments/runs/{run_id}/stop"
+        )
+
+        assert stop_response.status_code == 202
+
+        # 4. Wait for the worker to finish cleanup.
+        deadline = time.monotonic() + 3
+
+        while time.monotonic() < deadline:
+            result = client.get(
+                f"/api/v1/experiments/runs/{run_id}"
+            )
+
+            assert result.status_code == 200
+
+            if result.json()["status"] in (
+                "completed",
+                "aborted",
+                "failed",
+            ):
+                break
+
+            time.sleep(0.01)
+        else:
+            raise AssertionError("Cancellation timed out")
+
+        # 5. Verify the final state and cleanup.
+        assert result.json()["status"] == "aborted"
+        assert len(fake_k8s.custom_objects.created) == 1
+        assert len(fake_k8s.custom_objects.deleted) == 1
+
+    finally:
+        app.dependency_overrides.clear()

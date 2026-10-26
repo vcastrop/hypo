@@ -84,7 +84,7 @@ class ChaosMeshClient:
         Idempotent: if the resource does not exist (404), succeeds silently.
         """
         if self.custom_objects is None:
-            return
+            raise ClusterError("Kubernetes CustomObjectsApi is not configured")
 
         plural = KIND_TO_PLURAL.get(kind)
         if not plural:

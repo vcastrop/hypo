@@ -106,7 +106,23 @@ def test_rejects_blast_radius_above_50_percent():
 
 
 # ── Chaos Mesh Manifest & YAML Generation ───────────────────────────
+def test_rejects_empty_kubernetes_selector():
+    from app.modules.experiments.service import generate_chaos_mesh_manifest
 
+    target = _target()
+    target.labels = {}
+
+    experiment = define_experiment(
+        ExperimentDefinitionRequest(
+            target=target,
+            failure_type=FailureType.POD_KILL,
+            duration_seconds=30,
+            affected_replicas=1,
+        )
+    )
+
+    with pytest.raises(ValueError, match="non-empty Kubernetes pod selector"):
+        generate_chaos_mesh_manifest(experiment)
 
 def test_generates_pod_kill_manifest_and_yaml():
     experiment = define_experiment(

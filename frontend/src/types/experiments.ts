@@ -52,3 +52,17 @@ export interface ExperimentRunResult {
   started_at: string | null;
   ended_at: string | null;
 }
+
+export interface AbortCondition {
+  metric: 'error_rate' | 'success_rate';
+  threshold: number;
+  operator: '>' | '>=' | '<' | '<=';
+}
+
+export interface ExperimentRunRequest {
+  definition?: ExperimentDefinition;
+  definition_request?: ExperimentDefinitionRequest;
+  abort_condition: AbortCondition;
+  monitor_interval_seconds: number;
+  max_duration_seconds?: number;
+}
