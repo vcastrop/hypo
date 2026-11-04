@@ -68,6 +68,7 @@ def _to_workload(obj, namespace: str, kind: str) -> WorkloadInfo:
         labels=obj.spec.selector.match_labels or {},
     )
 
+
 def list_workloads(clients: K8sClients, namespace: str) -> list[WorkloadInfo]:
     _ensure_namespace(clients, namespace)
     with translate_k8s_errors():

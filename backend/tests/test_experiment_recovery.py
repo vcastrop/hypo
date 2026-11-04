@@ -6,20 +6,31 @@ from app.modules.experiments.recovery import measure_deployment_recovery
 
 
 def test_recovery_after_degradation():
-    states = iter([
-        (2, 2),  # Healthy
-        (2, 1),  # Degradation detected
-        (2, 1),  # Still degraded
-        (2, 2),  # Recovered
-    ])
+    states = iter(
+        [
+            (2, 2),  # Healthy
+            (2, 1),  # Degradation detected
+            (2, 1),  # Still degraded
+            (2, 2),  # Recovered
+        ]
+    )
 
-    clock = iter([
-        0,        # Initial deadline
-        0, 0, 0,  # First observation
-        1, 1, 1,  # Second observation
-        2, 2, 2,  # Third observation
-        3, 3,     # Fourth observation: recovery
-    ])
+    clock = iter(
+        [
+            0,  # Initial deadline
+            0,
+            0,
+            0,  # First observation
+            1,
+            1,
+            1,  # Second observation
+            2,
+            2,
+            2,  # Third observation
+            3,
+            3,  # Fourth observation: recovery
+        ]
+    )
 
     with (
         patch(

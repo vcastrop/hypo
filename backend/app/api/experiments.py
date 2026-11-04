@@ -115,6 +115,7 @@ def run_experiment(
     except ClusterError as exc:
         raise _handle_cluster_error(exc) from exc
 
+
 @router.post(
     "/runs/async",
     response_model=ExperimentRunResult,
@@ -157,6 +158,7 @@ def start_experiment_async(
     except ClusterError as exc:
         raise _handle_cluster_error(exc) from exc
 
+
 @router.get(
     "/runs",
     response_model=list[ExperimentRunResult],
@@ -179,6 +181,7 @@ def get_experiment_run(run_id: str) -> ExperimentRunResult:
             detail=f"Experiment run '{run_id}' not found",
         )
     return run
+
 
 @router.post(
     "/runs/{run_id}/stop",

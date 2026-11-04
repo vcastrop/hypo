@@ -90,14 +90,11 @@ def test_list_workloads_includes_both_kinds_and_handles_none_ready():
     assert by_name["catalog-service"].replicas_desired == 2
     assert by_name["db"].kind == "StatefulSet"
 
+
 def test_workload_uses_pod_selector_not_metadata_labels():
     workloads = service.list_workloads(_clients(), "mybookstore")
 
-    catalog = next(
-        workload
-        for workload in workloads
-        if workload.name == "catalog-service"
-    )
+    catalog = next(workload for workload in workloads if workload.name == "catalog-service")
 
     assert catalog.labels == {"app": "catalog-service"}
     assert catalog.labels != {"environment": "test"}

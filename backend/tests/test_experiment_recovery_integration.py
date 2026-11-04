@@ -1,4 +1,5 @@
 """Integration tests for Kubernetes recovery monitoring in the runner."""
+
 import threading
 import time
 from unittest.mock import patch
@@ -163,9 +164,7 @@ def test_runner_observes_recovery_after_chaos_cleanup():
 
     assert observer_started.is_set()
     assert cleanup_completed.is_set()
-    assert recovery_observed.is_set(), (
-        "Recovery monitoring stopped before Kubernetes recovered"
-    )
+    assert recovery_observed.is_set(), "Recovery monitoring stopped before Kubernetes recovered"
     assert finished.status == ExperimentStatus.COMPLETED
 
 
@@ -232,10 +231,9 @@ def test_kubernetes_is_checked_before_pod_kill():
     assert "kubernetes_checked" in execution_order
     assert "chaos_applied" in execution_order
 
-    assert (
-        execution_order.index("kubernetes_checked")
-        < execution_order.index("chaos_applied")
-    ), "Pod Kill was applied before the initial Kubernetes observation"
+    assert execution_order.index("kubernetes_checked") < execution_order.index("chaos_applied"), (
+        "Pod Kill was applied before the initial Kubernetes observation"
+    )
 
 
 def test_runner_waits_for_recovery_before_completing():

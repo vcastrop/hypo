@@ -101,10 +101,7 @@ def test_missing_recovery_cannot_pass(healthy_metrics):
     assert result.verdict == ExperimentVerdict.FAIL
     assert result.hypothesis_met is False
     assert result.recovery_time_seconds is None
-    assert any(
-        "recovery" in detail.lower()
-        for detail in result.details
-    )
+    assert any("recovery" in detail.lower() for detail in result.details)
 
 
 def test_failed_experiment_cannot_pass(healthy_metrics):

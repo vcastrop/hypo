@@ -96,6 +96,8 @@ class ExperimentEvaluation(BaseModel):
     during_metrics: WindowMetrics = Field(default_factory=WindowMetrics)
     after_metrics: WindowMetrics = Field(default_factory=WindowMetrics)
     details: list[str] = []
+    findings_summary: str | None = None
+    summary: str | None = None
 
 
 class ExperimentYamlResponse(BaseModel):
@@ -125,3 +127,5 @@ class ExperimentRunResult(BaseModel):
     started_at: str | None = None
     ended_at: str | None = None
     evaluation: ExperimentEvaluation | None = None
+    findings_summary: str | None = None
+    summary: str | None = None
