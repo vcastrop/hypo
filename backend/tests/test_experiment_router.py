@@ -222,6 +222,7 @@ def test_get_nonexistent_run_returns_404():
     response = client.get("/api/v1/experiments/runs/run-doesnotexist")
     assert response.status_code == 404
 
+
 def test_async_run_endpoint_completes():
     import time
 
@@ -280,9 +281,7 @@ def test_async_run_endpoint_completes():
         deadline = time.monotonic() + 3
 
         while time.monotonic() < deadline:
-            result = client.get(
-                f"/api/v1/experiments/runs/{run_id}"
-            )
+            result = client.get(f"/api/v1/experiments/runs/{run_id}")
 
             assert result.status_code == 200
 
@@ -306,9 +305,7 @@ def test_async_run_endpoint_completes():
 
 
 def test_async_stop_nonexistent_run_returns_404():
-    response = client.post(
-        "/api/v1/experiments/runs/run-doesnotexist/stop"
-    )
+    response = client.post("/api/v1/experiments/runs/run-doesnotexist/stop")
 
     assert response.status_code == 404
 
@@ -353,6 +350,7 @@ def test_async_run_rejects_excessive_duration():
     finally:
         app.dependency_overrides.clear()
 
+
 def test_async_stop_active_experiment():
     import time
 
@@ -383,12 +381,29 @@ def test_async_stop_active_experiment():
         }
 
         # 1. Start the experiment.
-        response = client.post(
-            "/api/v1/experiments/runs/async",
-            json=payload,
-        )
+        from unittest.mock import patch
 
-        assert response.status_code == 202
+        def fake_recovery(
+            get_replica_status,
+            timeout_seconds=60.0,
+            poll_interval_seconds=1.0,
+            stop_event=None,
+            ready_event=None,
+        ):
+            if ready_event is not None:
+                ready_event.set()
+            return 0.25
+
+        with patch(
+            "app.modules.experiments.runner.measure_deployment_recovery",
+            side_effect=fake_recovery,
+        ):
+            response = client.post(
+                "/api/v1/experiments/runs/async",
+                json=payload,
+            )
+
+            assert response.status_code == 202
 
         run_id = response.json()["id"]
 
@@ -404,9 +419,7 @@ def test_async_stop_active_experiment():
             raise AssertionError("Chaos resource was not created")
 
         # 3. Request cancellation through HTTP.
-        stop_response = client.post(
-            f"/api/v1/experiments/runs/{run_id}/stop"
-        )
+        stop_response = client.post(f"/api/v1/experiments/runs/{run_id}/stop")
 
         assert stop_response.status_code == 202
 
@@ -414,9 +427,7 @@ def test_async_stop_active_experiment():
         deadline = time.monotonic() + 3
 
         while time.monotonic() < deadline:
-            result = client.get(
-                f"/api/v1/experiments/runs/{run_id}"
-            )
+            result = client.get(f"/api/v1/experiments/runs/{run_id}")
 
             assert result.status_code == 200
 

@@ -1,3 +1,5 @@
+import { FileText } from 'lucide-react';
+
 import type {
   ExperimentEvaluation,
   WindowMetrics,
@@ -5,6 +7,7 @@ import type {
 
 interface ExperimentResultCardProps {
   evaluation: ExperimentEvaluation | null;
+  summary?: string | null;
 }
 
 const metricRows: {
@@ -27,7 +30,10 @@ function formatMetric(value: number | null, unit: string): string {
 
 export function ExperimentResultCard({
   evaluation,
+  summary,
 }: ExperimentResultCardProps) {
+  const displaySummary = summary ?? evaluation?.findings_summary ?? evaluation?.summary;
+
   if (!evaluation) {
     return (
       <div className="mt-5 rounded-lg border border-[#383838] bg-[#242424] p-4">
@@ -37,6 +43,14 @@ export function ExperimentResultCard({
         <p className="mt-1 text-xs text-slate-400">
           No hay resultados suficientes para determinar PASS o FAIL.
         </p>
+        {displaySummary && (
+          <div className="mt-3 border-t border-[#383838] pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-sky-400">
+              Resumen de hallazgos
+            </p>
+            <p className="mt-1 text-sm text-slate-200">{displaySummary}</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -65,6 +79,22 @@ export function ExperimentResultCard({
           {evaluation.verdict}
         </span>
       </div>
+
+      {displaySummary && (
+        <div className="mt-4 rounded-lg border border-sky-800/40 bg-sky-950/20 p-4">
+          <div className="flex items-start gap-3">
+            <FileText className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+            <div>
+              <h5 className="text-xs font-semibold uppercase tracking-wider text-sky-300">
+                Resumen de hallazgos
+              </h5>
+              <p className="mt-1 text-sm font-medium text-slate-200 leading-relaxed">
+                {displaySummary}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-5 overflow-x-auto rounded-lg border border-[#383838]">
         <table className="w-full min-w-[560px] text-sm">

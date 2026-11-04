@@ -124,6 +124,7 @@ def test_rejects_empty_kubernetes_selector():
     with pytest.raises(ValueError, match="non-empty Kubernetes pod selector"):
         generate_chaos_mesh_manifest(experiment)
 
+
 def test_generates_pod_kill_manifest_and_yaml():
     experiment = define_experiment(
         ExperimentDefinitionRequest(

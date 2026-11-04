@@ -242,7 +242,10 @@ export const ExperimentRunsView: React.FC = () => {
               </div>
 
               {['completed', 'aborted', 'failed'].includes(run.status) && (
-                <ExperimentResultCard evaluation={run.evaluation} />
+                <ExperimentResultCard
+                  evaluation={run.evaluation}
+                  summary={run.findings_summary ?? run.summary}
+                />
               )}
 
               {run.abort_triggered && (

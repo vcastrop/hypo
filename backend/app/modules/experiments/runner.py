@@ -18,6 +18,7 @@ from app.modules.experiments.schemas import (
     ExperimentRunResult,
     ExperimentStatus,
     MetricSample,
+    WindowMetrics,
 )
 from app.modules.experiments.service import (
     _RUN_HISTORY,
@@ -29,10 +30,13 @@ from app.modules.experiments.service import (
     pull_window_metrics,
     sample_metric,
 )
+from app.modules.reports.service import generate_findings_summary
 
 logger = logging.getLogger(__name__)
 
 MAX_EXPERIMENT_DURATION_SECONDS = 300
+
+
 class ExperimentRunner:
     """Manage experiment registrations and cancellation requests."""
 
@@ -49,9 +53,7 @@ class ExperimentRunner:
         elif request.definition is not None:
             experiment = request.definition
         else:
-            raise ValueError(
-                "Either 'definition' or 'definition_request' must be provided"
-            )
+            raise ValueError("Either 'definition' or 'definition_request' must be provided")
 
         # Revalidate supplied definitions instead of trusting client values.
 
@@ -66,8 +68,7 @@ class ExperimentRunner:
 
         if experiment.duration_seconds > MAX_EXPERIMENT_DURATION_SECONDS:
             raise ValueError(
-                "Experiment duration cannot exceed "
-                f"{MAX_EXPERIMENT_DURATION_SECONDS} seconds"
+                f"Experiment duration cannot exceed {MAX_EXPERIMENT_DURATION_SECONDS} seconds"
             )
 
         if (
@@ -75,8 +76,7 @@ class ExperimentRunner:
             and request.max_duration_seconds > experiment.duration_seconds
         ):
             raise ValueError(
-                "Maximum execution duration cannot exceed "
-                "the experiment definition duration"
+                "Maximum execution duration cannot exceed the experiment definition duration"
             )
 
         run_id = f"run-{uuid.uuid4().hex}"
@@ -221,6 +221,7 @@ class ExperimentRunner:
             logger.info("Applying experiment %s", run_id)
 
             if experiment.failure_type.value == "pod-kill":
+
                 def observe_recovery():
                     try:
                         recovery_result["seconds"] = measure_deployment_recovery(
@@ -248,8 +249,7 @@ class ExperimentRunner:
                 if not recovery_ready.wait(timeout=2.0):
                     recovery_stop.set()
                     raise RuntimeError(
-                        "Kubernetes recovery observer was not ready "
-                        "before chaos injection"
+                        "Kubernetes recovery observer was not ready before chaos injection"
                     )
 
             # Attempt cleanup even if the apply operation raises.
@@ -287,8 +287,7 @@ class ExperimentRunner:
                         final_status = ExperimentStatus.ABORTED
                         abort_triggered = True
                         abort_reason = (
-                            f"Abort condition triggered: "
-                            f"{request.abort_condition.metric}={value}"
+                            f"Abort condition triggered: {request.abort_condition.metric}={value}"
                         )
                         break
 
@@ -325,11 +324,7 @@ class ExperimentRunner:
 
             # Wait for observed recovery before publishing final results.
             if recovery_thread is not None:
-                if (
-                    chaos_applied
-                    and cleanup_error is None
-                    and not cancel_event.is_set()
-                ):
+                if chaos_applied and cleanup_error is None and not cancel_event.is_set():
                     recovery_deadline = time.monotonic() + 60.0
 
                     while (
@@ -338,9 +333,7 @@ class ExperimentRunner:
                         and not cancel_event.is_set()
                     ):
                         remaining = recovery_deadline - time.monotonic()
-                        recovery_thread.join(
-                            timeout=min(0.1, max(0.0, remaining))
-                        )
+                        recovery_thread.join(timeout=min(0.1, max(0.0, remaining)))
 
                 recovery_stop.set()
                 recovery_thread.join(timeout=0.5)
@@ -384,11 +377,29 @@ class ExperimentRunner:
                 except Exception:
                     logger.exception("Evaluation failed for %s", run_id)
 
+            findings_summary = (
+                evaluation.findings_summary
+                if evaluation is not None and evaluation.findings_summary is not None
+                else generate_findings_summary(
+                    experiment=experiment,
+                    status=final_status,
+                    before_metrics=before_metrics or WindowMetrics(),
+                    during_metrics=during_metrics or WindowMetrics(),
+                    after_metrics=after_metrics or WindowMetrics(),
+                    recovery_time_seconds=recovery_time_seconds,
+                    abort_triggered=abort_triggered,
+                    abort_reason=abort_reason,
+                    metrics_observed=metrics_observed,
+                )
+            )
+
             with self._lock:
                 result = _RUN_HISTORY[run_id]
                 result.metrics_observed = metrics_observed
                 result.abort_triggered = abort_triggered
                 result.evaluation = evaluation
+                result.findings_summary = findings_summary
+                result.summary = findings_summary
 
             self.finish(
                 run_id,
@@ -452,6 +463,32 @@ class ExperimentRunner:
             if reason is not None:
                 result.abort_reason = reason
 
+            if result.findings_summary is None:
+                summary = generate_findings_summary(
+                    experiment=result.experiment,
+                    status=status,
+                    before_metrics=result.evaluation.before_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    during_metrics=result.evaluation.during_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    after_metrics=result.evaluation.after_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    recovery_time_seconds=result.evaluation.recovery_time_seconds
+                    if result.evaluation
+                    else None,
+                    abort_triggered=result.abort_triggered,
+                    abort_reason=result.abort_reason,
+                    metrics_observed=result.metrics_observed,
+                )
+                result.findings_summary = summary
+                result.summary = summary
+                if result.evaluation:
+                    result.evaluation.findings_summary = summary
+                    result.evaluation.summary = summary
+
             target_key = (
                 result.experiment.target.namespace,
                 result.experiment.target.name,
@@ -464,5 +501,6 @@ class ExperimentRunner:
             self._cancel_events.pop(run_id, None)
 
             return result.model_copy(deep=True)
+
 
 experiment_runner = ExperimentRunner()

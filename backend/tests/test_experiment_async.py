@@ -98,6 +98,7 @@ def test_get_returns_run_snapshot():
 
     runner.finish(result.id, ExperimentStatus.COMPLETED)
 
+
 def test_register_generates_unique_chaos_resource_names():
     runner = ExperimentRunner()
 
@@ -119,7 +120,6 @@ def test_register_generates_unique_chaos_resource_names():
 
     assert first_manifest["metadata"]["annotations"]["hypo/run-id"] == first.id
     assert second_manifest["metadata"]["annotations"]["hypo/run-id"] == second.id
-
 
 
 class FakeChaosClient:
@@ -224,13 +224,30 @@ def test_async_experiment_can_be_stopped():
         }
     )
 
-    result = runner.start(request, chaos)
+    from unittest.mock import patch
 
-    assert chaos.applied_event.wait(timeout=2)
+    def fake_recovery(
+        get_replica_status,
+        timeout_seconds=60.0,
+        poll_interval_seconds=1.0,
+        stop_event=None,
+        ready_event=None,
+    ):
+        if ready_event is not None:
+            ready_event.set()
+        return 0.25
 
-    runner.request_stop(result.id)
+    with patch(
+        "app.modules.experiments.runner.measure_deployment_recovery",
+        side_effect=fake_recovery,
+    ):
+        result = runner.start(request, chaos)
 
-    finished = wait_for_terminal_status(runner, result.id)
+        assert chaos.applied_event.wait(timeout=2)
+
+        runner.request_stop(result.id)
+
+        finished = wait_for_terminal_status(runner, result.id)
 
     assert finished.status == ExperimentStatus.ABORTED
     assert len(chaos.deleted) == 1
@@ -247,9 +264,26 @@ def test_async_experiment_handles_apply_failure():
         }
     )
 
-    result = runner.start(request, chaos)
+    from unittest.mock import patch
 
-    finished = wait_for_terminal_status(runner, result.id)
+    def fake_recovery(
+        get_replica_status,
+        timeout_seconds=60.0,
+        poll_interval_seconds=1.0,
+        stop_event=None,
+        ready_event=None,
+    ):
+        if ready_event is not None:
+            ready_event.set()
+        return 0.25
+
+    with patch(
+        "app.modules.experiments.runner.measure_deployment_recovery",
+        side_effect=fake_recovery,
+    ):
+        result = runner.start(request, chaos)
+
+        finished = wait_for_terminal_status(runner, result.id)
 
     assert finished.status == ExperimentStatus.FAILED
     assert "Simulated Chaos Mesh failure" in finished.abort_reason
@@ -258,19 +292,14 @@ def test_async_experiment_handles_apply_failure():
     assert len(chaos.deleted) == 1
 
 
-
 def test_register_rejects_excessive_duration():
     runner = ExperimentRunner()
 
     request = make_request()
 
-    definition = request.definition_request.model_copy(
-        update={"duration_seconds": 301}
-    )
+    definition = request.definition_request.model_copy(update={"duration_seconds": 301})
 
-    request = request.model_copy(
-        update={"definition_request": definition}
-    )
+    request = request.model_copy(update={"definition_request": definition})
 
     with pytest.raises(ValueError, match="cannot exceed"):
         runner.register(request)
@@ -279,12 +308,11 @@ def test_register_rejects_excessive_duration():
 def test_register_rejects_execution_longer_than_definition():
     runner = ExperimentRunner()
 
-    request = make_request().model_copy(
-        update={"max_duration_seconds": 120}
-    )
+    request = make_request().model_copy(update={"max_duration_seconds": 120})
 
     with pytest.raises(ValueError, match="cannot exceed"):
         runner.register(request)
+
 
 class FakeChaosCleanupFailure(FakeChaosClient):
     def delete_experiment(self, kind, namespace, name):

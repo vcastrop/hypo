@@ -22,6 +22,7 @@ from app.modules.experiments.schemas import (
     SuccessCriteria,
     WindowMetrics,
 )
+from app.modules.reports.service import generate_findings_summary
 
 logger = logging.getLogger(__name__)
 
@@ -359,15 +360,10 @@ def evaluate_experiment(
     if (
         after_metrics.error_rate is None
         or after_metrics.success_rate is None
-        or (
-            criteria.max_p95_latency_ms is not None
-            and after_metrics.p95_latency_ms is None
-        )
+        or (criteria.max_p95_latency_ms is not None and after_metrics.p95_latency_ms is None)
     ):
         passed = False
-        details.append(
-            "Insufficient post-chaos metrics to verify all configured SLOs"
-        )
+        details.append("Insufficient post-chaos metrics to verify all configured SLOs")
 
     # Evaluate after metrics (steady state recovery)
     if after_metrics.error_rate is not None:
@@ -412,9 +408,7 @@ def evaluate_experiment(
     if criteria.max_recovery_time_seconds is not None:
         if recovery_time_seconds is None:
             passed = False
-            details.append(
-                "Recovery could not be verified: no recovery time was observed"
-            )
+            details.append("Recovery could not be verified: no recovery time was observed")
         elif recovery_time_seconds > criteria.max_recovery_time_seconds:
             passed = False
             details.append(
@@ -429,6 +423,17 @@ def evaluate_experiment(
 
     verdict = ExperimentVerdict.PASS if passed else ExperimentVerdict.FAIL
 
+    findings_summary = generate_findings_summary(
+        experiment=experiment,
+        status=status,
+        before_metrics=before_metrics,
+        during_metrics=during_metrics,
+        after_metrics=after_metrics,
+        recovery_time_seconds=recovery_time_seconds,
+        abort_triggered=abort_triggered,
+        abort_reason=abort_reason,
+    )
+
     return ExperimentEvaluation(
         verdict=verdict,
         hypothesis_met=passed,
@@ -437,6 +442,8 @@ def evaluate_experiment(
         during_metrics=during_metrics,
         after_metrics=after_metrics,
         details=details,
+        findings_summary=findings_summary,
+        summary=findings_summary,
     )
 
 
@@ -596,6 +603,8 @@ def execute_experiment(
         started_at=started_at,
         ended_at=ended_at,
         evaluation=evaluation,
+        findings_summary=evaluation.findings_summary if evaluation else None,
+        summary=evaluation.summary if evaluation else None,
     )
 
     _RUN_HISTORY[run_id] = result

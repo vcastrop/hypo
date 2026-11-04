@@ -55,6 +55,8 @@ export interface ExperimentEvaluation {
   during_metrics: WindowMetrics;
   after_metrics: WindowMetrics;
   details: string[];
+  findings_summary?: string | null;
+  summary?: string | null;
 }
 
 export interface ExperimentRunResult {
@@ -68,6 +70,8 @@ export interface ExperimentRunResult {
   started_at: string | null;
   ended_at: string | null;
   evaluation: ExperimentEvaluation | null;
+  findings_summary?: string | null;
+  summary?: string | null;
 }
 
 export interface AbortCondition {
