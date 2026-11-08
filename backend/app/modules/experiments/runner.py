@@ -11,6 +11,7 @@ import yaml
 from app.integrations.chaos_mesh import ChaosMeshClient
 from app.integrations.kubernetes import get_deployment_replica_status
 from app.integrations.prometheus import PrometheusClient
+from app.modules.economics import calculate_economic_impact
 from app.modules.experiments.recovery import measure_deployment_recovery
 from app.modules.experiments.schemas import (
     ExperimentDefinitionRequest,
@@ -513,6 +514,29 @@ class ExperimentRunner:
                 result.recommendations = recs
                 if result.evaluation:
                     result.evaluation.recommendations = recs
+
+                econ = calculate_economic_impact(
+                    experiment=result.experiment,
+                    status=result.status,
+                    before_metrics=result.evaluation.before_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    during_metrics=result.evaluation.during_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    after_metrics=result.evaluation.after_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    recovery_time_seconds=result.evaluation.recovery_time_seconds
+                    if result.evaluation
+                    else None,
+                    cost_per_hour=getattr(result.experiment, "cost_per_hour", 1000.0),
+                    abort_triggered=result.abort_triggered,
+                    abort_reason=result.abort_reason,
+                )
+                result.economic_impact = econ
+                if result.evaluation:
+                    result.evaluation.economic_impact = econ
 
             target_key = (
                 result.experiment.target.namespace,
