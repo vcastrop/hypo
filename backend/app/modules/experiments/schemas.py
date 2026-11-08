@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.modules.economics.schemas import EconomicImpact
+
 
 class FailureType(StrEnum):
     POD_KILL = "pod-kill"
@@ -24,6 +26,7 @@ class ExperimentDefinitionRequest(BaseModel):
     failure_type: FailureType
     duration_seconds: int = Field(default=60, gt=0)
     affected_replicas: int = Field(default=1, gt=0)
+    cost_per_hour: float = Field(default=1000.0, gt=0)
 
 
 class ExperimentDefinition(BaseModel):
@@ -33,6 +36,7 @@ class ExperimentDefinition(BaseModel):
     duration_seconds: int
     hypothesis: str
     affected_replicas: int = 1
+    cost_per_hour: float = 1000.0
 
 
 class AbortCondition(BaseModel):
@@ -108,6 +112,7 @@ class ExperimentEvaluation(BaseModel):
     findings_summary: str | None = None
     summary: str | None = None
     recommendations: list[Recommendation] = []
+    economic_impact: EconomicImpact | None = None
 
 
 class ExperimentYamlResponse(BaseModel):
@@ -140,3 +145,4 @@ class ExperimentRunResult(BaseModel):
     findings_summary: str | None = None
     summary: str | None = None
     recommendations: list[Recommendation] = []
+    economic_impact: EconomicImpact | None = None

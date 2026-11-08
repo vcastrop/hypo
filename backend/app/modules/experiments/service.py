@@ -8,6 +8,7 @@ import yaml
 
 from app.integrations.chaos_mesh import ChaosMeshClient
 from app.integrations.prometheus import PrometheusClient
+from app.modules.economics import calculate_economic_impact
 from app.modules.experiments.schemas import (
     AbortCondition,
     ExperimentDefinition,
@@ -101,6 +102,7 @@ def define_experiment(request: ExperimentDefinitionRequest) -> ExperimentDefinit
         duration_seconds=request.duration_seconds,
         hypothesis=hypothesis,
         affected_replicas=request.affected_replicas,
+        cost_per_hour=request.cost_per_hour,
     )
 
 
@@ -448,6 +450,18 @@ def evaluate_experiment(
         abort_reason=abort_reason,
     )
 
+    econ_impact = calculate_economic_impact(
+        experiment=experiment,
+        status=status,
+        before_metrics=before_metrics,
+        during_metrics=during_metrics,
+        after_metrics=after_metrics,
+        recovery_time_seconds=recovery_time_seconds,
+        cost_per_hour=getattr(experiment, "cost_per_hour", 1000.0),
+        abort_triggered=abort_triggered,
+        abort_reason=abort_reason,
+    )
+
     return ExperimentEvaluation(
         verdict=verdict,
         hypothesis_met=passed,
@@ -459,6 +473,7 @@ def evaluate_experiment(
         findings_summary=findings_summary,
         summary=findings_summary,
         recommendations=recs,
+        economic_impact=econ_impact,
     )
 
 
@@ -621,6 +636,7 @@ def execute_experiment(
         findings_summary=evaluation.findings_summary if evaluation else None,
         summary=evaluation.summary if evaluation else None,
         recommendations=evaluation.recommendations if evaluation else [],
+        economic_impact=evaluation.economic_impact if evaluation else None,
     )
 
     _RUN_HISTORY[run_id] = result
