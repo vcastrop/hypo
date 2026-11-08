@@ -17,6 +17,7 @@ export interface ExperimentDefinitionRequest {
   failure_type: FailureType;
   duration_seconds: number;
   affected_replicas: number;
+  cost_per_hour?: number;
 }
 
 export interface ExperimentDefinition {
@@ -26,6 +27,7 @@ export interface ExperimentDefinition {
   duration_seconds: number;
   hypothesis: string;
   affected_replicas: number;
+  cost_per_hour?: number;
 }
 
 export type ExperimentStatus =
@@ -56,6 +58,19 @@ export interface Recommendation {
   severity: 'critical' | 'high' | 'medium' | 'low';
 }
 
+export interface EconomicImpact {
+  currency: string;
+  cost_per_hour: number;
+  downtime_duration_seconds: number;
+  degraded_duration_seconds: number;
+  estimated_downtime_cost: number;
+  estimated_degradation_cost: number;
+  total_estimated_impact: number;
+  formula: string;
+  assumptions: string[];
+  severity: 'low' | 'medium' | 'high' | 'critical';
+}
+
 export interface ExperimentEvaluation {
   verdict: 'PASS' | 'FAIL';
   hypothesis_met: boolean;
@@ -67,6 +82,7 @@ export interface ExperimentEvaluation {
   findings_summary?: string | null;
   summary?: string | null;
   recommendations?: Recommendation[];
+  economic_impact?: EconomicImpact | null;
 }
 
 export interface ExperimentRunResult {
@@ -83,6 +99,7 @@ export interface ExperimentRunResult {
   findings_summary?: string | null;
   summary?: string | null;
   recommendations?: Recommendation[];
+  economic_impact?: EconomicImpact | null;
 }
 
 export interface AbortCondition {

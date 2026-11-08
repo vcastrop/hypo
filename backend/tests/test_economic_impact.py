@@ -183,3 +183,41 @@ def test_api_estimate_endpoint():
     assert data["total_estimated_impact"] == 90.0
     assert "formula" in data
     assert len(data["assumptions"]) >= 3
+
+
+def test_format_economic_impact_summary_zero_loss():
+    """format_economic_impact_summary indicates zero loss on steady runs."""
+    from app.modules.reports.service import format_economic_impact_summary
+
+    exp = make_experiment(cost_per_hour=1000.0)
+    impact = calculate_economic_impact(
+        experiment=exp,
+        status=ExperimentStatus.COMPLETED,
+        before_metrics=WindowMetrics(error_rate=0.0),
+        during_metrics=WindowMetrics(error_rate=0.0),
+        after_metrics=WindowMetrics(error_rate=0.0),
+        cost_per_hour=1000.0,
+    )
+    summary = format_economic_impact_summary(impact)
+    assert "No financial losses estimated" in summary
+    assert "$1,000.00/h" in summary
+
+
+def test_format_economic_impact_summary_with_downtime():
+    """format_economic_impact_summary formats financial statement with breakdown."""
+    from app.modules.reports.service import format_economic_impact_summary
+
+    exp = make_experiment(duration_seconds=60, cost_per_hour=3600.0)
+    impact = calculate_economic_impact(
+        experiment=exp,
+        status=ExperimentStatus.ABORTED,
+        before_metrics=WindowMetrics(error_rate=0.0),
+        during_metrics=WindowMetrics(error_rate=100.0),
+        after_metrics=WindowMetrics(error_rate=0.0),
+        cost_per_hour=3600.0,
+        abort_triggered=True,
+    )
+    summary = format_economic_impact_summary(impact)
+    assert "Estimated financial impact: $60.00 USD" in summary
+    assert "$60.00 downtime" in summary
+    assert "$3,600.00/h" in summary
