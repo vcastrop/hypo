@@ -30,7 +30,10 @@ from app.modules.experiments.service import (
     pull_window_metrics,
     sample_metric,
 )
-from app.modules.reports.service import generate_findings_summary
+from app.modules.reports.service import (
+    generate_findings_summary,
+    generate_recommendations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -488,6 +491,28 @@ class ExperimentRunner:
                 if result.evaluation:
                     result.evaluation.findings_summary = summary
                     result.evaluation.summary = summary
+
+                recs = generate_recommendations(
+                    experiment=result.experiment,
+                    status=result.status,
+                    before_metrics=result.evaluation.before_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    during_metrics=result.evaluation.during_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    after_metrics=result.evaluation.after_metrics
+                    if result.evaluation
+                    else WindowMetrics(),
+                    recovery_time_seconds=result.evaluation.recovery_time_seconds
+                    if result.evaluation
+                    else None,
+                    abort_triggered=result.abort_triggered,
+                    abort_reason=result.abort_reason,
+                )
+                result.recommendations = recs
+                if result.evaluation:
+                    result.evaluation.recommendations = recs
 
             target_key = (
                 result.experiment.target.namespace,

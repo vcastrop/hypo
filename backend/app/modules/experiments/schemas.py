@@ -88,6 +88,15 @@ class WindowMetrics(BaseModel):
     p95_latency_ms: float | None = None
 
 
+class Recommendation(BaseModel):
+    id: str
+    title: str
+    category: str
+    description: str
+    action_items: list[str] = []
+    severity: Literal["critical", "high", "medium", "low"] = "medium"
+
+
 class ExperimentEvaluation(BaseModel):
     verdict: ExperimentVerdict
     hypothesis_met: bool
@@ -98,6 +107,7 @@ class ExperimentEvaluation(BaseModel):
     details: list[str] = []
     findings_summary: str | None = None
     summary: str | None = None
+    recommendations: list[Recommendation] = []
 
 
 class ExperimentYamlResponse(BaseModel):
@@ -129,3 +139,4 @@ class ExperimentRunResult(BaseModel):
     evaluation: ExperimentEvaluation | None = None
     findings_summary: str | None = None
     summary: str | None = None
+    recommendations: list[Recommendation] = []

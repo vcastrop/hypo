@@ -245,6 +245,7 @@ export const ExperimentRunsView: React.FC = () => {
                 <ExperimentResultCard
                   evaluation={run.evaluation}
                   summary={run.findings_summary ?? run.summary}
+                  recommendations={run.recommendations ?? run.evaluation?.recommendations}
                 />
               )}
 

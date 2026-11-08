@@ -22,7 +22,10 @@ from app.modules.experiments.schemas import (
     SuccessCriteria,
     WindowMetrics,
 )
-from app.modules.reports.service import generate_findings_summary
+from app.modules.reports.service import (
+    generate_findings_summary,
+    generate_recommendations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -434,6 +437,17 @@ def evaluate_experiment(
         abort_reason=abort_reason,
     )
 
+    recs = generate_recommendations(
+        experiment=experiment,
+        status=status,
+        before_metrics=before_metrics,
+        during_metrics=during_metrics,
+        after_metrics=after_metrics,
+        recovery_time_seconds=recovery_time_seconds,
+        abort_triggered=abort_triggered,
+        abort_reason=abort_reason,
+    )
+
     return ExperimentEvaluation(
         verdict=verdict,
         hypothesis_met=passed,
@@ -444,6 +458,7 @@ def evaluate_experiment(
         details=details,
         findings_summary=findings_summary,
         summary=findings_summary,
+        recommendations=recs,
     )
 
 
@@ -605,6 +620,7 @@ def execute_experiment(
         evaluation=evaluation,
         findings_summary=evaluation.findings_summary if evaluation else None,
         summary=evaluation.summary if evaluation else None,
+        recommendations=evaluation.recommendations if evaluation else [],
     )
 
     _RUN_HISTORY[run_id] = result

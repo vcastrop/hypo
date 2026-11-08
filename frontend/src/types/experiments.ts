@@ -47,6 +47,15 @@ export interface WindowMetrics {
   p95_latency_ms: number | null;
 }
 
+export interface Recommendation {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  action_items: string[];
+  severity: 'critical' | 'high' | 'medium' | 'low';
+}
+
 export interface ExperimentEvaluation {
   verdict: 'PASS' | 'FAIL';
   hypothesis_met: boolean;
@@ -57,6 +66,7 @@ export interface ExperimentEvaluation {
   details: string[];
   findings_summary?: string | null;
   summary?: string | null;
+  recommendations?: Recommendation[];
 }
 
 export interface ExperimentRunResult {
@@ -72,6 +82,7 @@ export interface ExperimentRunResult {
   evaluation: ExperimentEvaluation | null;
   findings_summary?: string | null;
   summary?: string | null;
+  recommendations?: Recommendation[];
 }
 
 export interface AbortCondition {

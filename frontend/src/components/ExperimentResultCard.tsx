@@ -1,13 +1,15 @@
-import { FileText } from 'lucide-react';
+import { CheckCircle2, FileText, Lightbulb } from 'lucide-react';
 
 import type {
   ExperimentEvaluation,
+  Recommendation,
   WindowMetrics,
 } from '../types/experiments';
 
 interface ExperimentResultCardProps {
   evaluation: ExperimentEvaluation | null;
   summary?: string | null;
+  recommendations?: Recommendation[];
 }
 
 const metricRows: {
@@ -20,6 +22,20 @@ const metricRows: {
   { key: 'p95_latency_ms', label: 'Latencia P95', unit: 'ms' },
 ];
 
+const severityBadgeStyles: Record<Recommendation['severity'], string> = {
+  critical: 'border-rose-800/60 bg-rose-950/40 text-rose-300',
+  high: 'border-amber-800/60 bg-amber-950/40 text-amber-300',
+  medium: 'border-blue-800/60 bg-blue-950/40 text-blue-300',
+  low: 'border-emerald-800/60 bg-emerald-950/40 text-emerald-300',
+};
+
+const severityLabels: Record<Recommendation['severity'], string> = {
+  critical: 'Crítica',
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baja',
+};
+
 function formatMetric(value: number | null, unit: string): string {
   if (value === null || !Number.isFinite(value)) {
     return 'Sin datos';
@@ -31,8 +47,10 @@ function formatMetric(value: number | null, unit: string): string {
 export function ExperimentResultCard({
   evaluation,
   summary,
+  recommendations,
 }: ExperimentResultCardProps) {
   const displaySummary = summary ?? evaluation?.findings_summary ?? evaluation?.summary;
+  const displayRecs = recommendations ?? evaluation?.recommendations ?? [];
 
   if (!evaluation) {
     return (
@@ -92,6 +110,72 @@ export function ExperimentResultCard({
                 {displaySummary}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {displayRecs.length > 0 && (
+        <div className="mt-5 rounded-lg border border-[#383838] bg-[#1e1e1e] p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Lightbulb className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <h5 className="text-sm font-semibold text-white">
+                Recomendaciones de remediación
+              </h5>
+              <p className="text-xs text-slate-400">
+                Acciones sugeridas basadas en los patrones de fallo identificados
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 mt-3">
+            {displayRecs.map((rec) => (
+              <div
+                key={rec.id}
+                className="rounded-lg border border-[#2e2e2e] bg-[#242424] p-3.5 transition-colors hover:border-[#444]"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-white tracking-wide">
+                      {rec.title}
+                    </span>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#333333] text-slate-300">
+                      {rec.category}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                      severityBadgeStyles[rec.severity] ?? severityBadgeStyles.medium
+                    }`}
+                  >
+                    Severidad {severityLabels[rec.severity] ?? rec.severity}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed mt-1">
+                  {rec.description}
+                </p>
+
+                {rec.action_items && rec.action_items.length > 0 && (
+                  <div className="mt-2.5 pt-2.5 border-t border-[#333333]/80">
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Acciones recomendadas:
+                    </p>
+                    <ul className="space-y-1.5">
+                      {rec.action_items.map((item, idx) => (
+                        <li
+                          key={idx}
+                          className="flex items-start gap-2 text-xs text-slate-200"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
