@@ -31,6 +31,7 @@ export const ExperimentCreationView: React.FC = () => {
   const [failureType, setFailureType] = useState<FailureType>('pod-kill');
   const [duration, setDuration] = useState(60);
   const [affectedReplicas, setAffectedReplicas] = useState(1);
+  const [costPerHour, setCostPerHour] = useState(1000);
 
   const [loading, setLoading] = useState(false);
   const [loadingWorkloads, setLoadingWorkloads] = useState(false);
@@ -125,7 +126,9 @@ export const ExperimentCreationView: React.FC = () => {
     Number.isInteger(affectedReplicas) &&
     affectedReplicas > 0 &&
     affectedReplicas <= (target?.replicas ?? 0) &&
-    blastRadius <= 50;
+    blastRadius <= 50 &&
+    Number.isFinite(costPerHour) &&
+    costPerHour > 0;
 
   const handleValidate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -148,6 +151,7 @@ export const ExperimentCreationView: React.FC = () => {
         failure_type: failureType,
         duration_seconds: duration,
         affected_replicas: affectedReplicas,
+        cost_per_hour: costPerHour,
       });
 
       setDefinition(result);
@@ -316,6 +320,28 @@ export const ExperimentCreationView: React.FC = () => {
                 className="w-full bg-[#121212] border border-[#3a3a3a] rounded-lg p-3 text-white"
               />
             </label>
+
+            <label className="block space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-300">Costo por hora ($ USD)</span>
+                <span className="text-xs text-slate-500">Benchmark PYME</span>
+              </div>
+
+              <input
+                type="number"
+                min={1}
+                step={50}
+                value={costPerHour}
+                onChange={(event) => {
+                  setCostPerHour(Number(event.target.value));
+                  setDefinition(null);
+                }}
+                className="w-full bg-[#121212] border border-[#3a3a3a] rounded-lg p-3 text-white"
+              />
+              <p className="text-[11px] text-slate-400">
+                Pérdida por hora si este servicio se interrumpe (ventas u operación).
+              </p>
+            </label>
           </div>
 
           <div className="rounded-lg bg-[#151515] border border-[#333333] p-4">
@@ -434,6 +460,11 @@ export const ExperimentCreationView: React.FC = () => {
             <div>
               <p className="text-slate-400">Blast radius</p>
               <p className="text-white mt-1">{blastRadius.toFixed(1)}%</p>
+            </div>
+
+            <div>
+              <p className="text-slate-400">Benchmark financiero</p>
+              <p className="text-white mt-1">${costPerHour.toLocaleString()} USD/h</p>
             </div>
           </div>
 

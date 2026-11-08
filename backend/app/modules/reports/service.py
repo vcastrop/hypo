@@ -1,5 +1,6 @@
 """Findings and executive summary generation from chaos experiment metrics."""
 
+from app.modules.economics.schemas import EconomicImpact
 from app.modules.experiments.schemas import (
     ExperimentDefinition,
     ExperimentStatus,
@@ -340,3 +341,29 @@ def generate_recommendations(
         )
 
     return recs
+
+
+def format_economic_impact_summary(impact: EconomicImpact) -> str:
+    """Format a human-readable economic impact statement for executive reports."""
+    if impact.total_estimated_impact <= 0:
+        return f"No financial losses estimated (benchmark: ${impact.cost_per_hour:,.2f}/h)."
+
+    breakdown_parts: list[str] = []
+    if impact.downtime_duration_seconds > 0:
+        breakdown_parts.append(
+            f"${impact.estimated_downtime_cost:,.2f} downtime "
+            f"({impact.downtime_duration_seconds:.1f}s)"
+        )
+    if impact.degraded_duration_seconds > 0:
+        breakdown_parts.append(
+            f"${impact.estimated_degradation_cost:,.2f} degradation "
+            f"({impact.degraded_duration_seconds:.1f}s)"
+        )
+
+    breakdown_text = (
+        " + ".join(breakdown_parts) if breakdown_parts else f"${impact.total_estimated_impact:,.2f}"
+    )
+    return (
+        f"Estimated financial impact: ${impact.total_estimated_impact:,.2f} {impact.currency} "
+        f"({breakdown_text} at ${impact.cost_per_hour:,.2f}/h)."
+    )

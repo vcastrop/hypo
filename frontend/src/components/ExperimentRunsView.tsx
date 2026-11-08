@@ -246,6 +246,7 @@ export const ExperimentRunsView: React.FC = () => {
                   evaluation={run.evaluation}
                   summary={run.findings_summary ?? run.summary}
                   recommendations={run.recommendations ?? run.evaluation?.recommendations}
+                  economic_impact={run.economic_impact ?? run.evaluation?.economic_impact}
                 />
               )}
 

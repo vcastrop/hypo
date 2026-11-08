@@ -1,6 +1,16 @@
-import { CheckCircle2, FileText, Lightbulb } from 'lucide-react';
+import { useState } from 'react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  DollarSign,
+  FileText,
+  Info,
+  Lightbulb,
+} from 'lucide-react';
 
 import type {
+  EconomicImpact,
   ExperimentEvaluation,
   Recommendation,
   WindowMetrics,
@@ -10,6 +20,7 @@ interface ExperimentResultCardProps {
   evaluation: ExperimentEvaluation | null;
   summary?: string | null;
   recommendations?: Recommendation[];
+  economic_impact?: EconomicImpact | null;
 }
 
 const metricRows: {
@@ -48,9 +59,13 @@ export function ExperimentResultCard({
   evaluation,
   summary,
   recommendations,
+  economic_impact,
 }: ExperimentResultCardProps) {
+  const [showEconomicDetails, setShowEconomicDetails] = useState(false);
+
   const displaySummary = summary ?? evaluation?.findings_summary ?? evaluation?.summary;
   const displayRecs = recommendations ?? evaluation?.recommendations ?? [];
+  const displayEcon = economic_impact ?? evaluation?.economic_impact;
 
   if (!evaluation) {
     return (
@@ -111,6 +126,126 @@ export function ExperimentResultCard({
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {displayEcon && (
+        <div className="mt-5 rounded-lg border border-emerald-900/40 bg-[#16201a] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <h5 className="text-sm font-semibold text-white">
+                  Impacto económico estimado
+                </h5>
+                <p className="text-xs text-slate-400">
+                  Estimación financiera proporcional al tiempo de caída y degradación
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                  severityBadgeStyles[displayEcon.severity] ?? severityBadgeStyles.low
+                }`}
+              >
+                Riesgo {severityLabels[displayEcon.severity] ?? displayEcon.severity}
+              </span>
+              <span className="text-xl font-mono font-bold text-emerald-400">
+                ${displayEcon.total_estimated_impact.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{' '}
+                <span className="text-xs text-emerald-300/80 font-normal">
+                  {displayEcon.currency}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 mt-3">
+            <div className="rounded-lg border border-[#2e3e34] bg-[#1a2620] p-3">
+              <p className="text-[11px] text-slate-400 font-medium">
+                Pérdida por caída total
+              </p>
+              <p className="text-base font-semibold text-white mt-1">
+                ${displayEcon.estimated_downtime_cost.toFixed(2)}{' '}
+                <span className="text-xs text-slate-400 font-normal">
+                  ({displayEcon.downtime_duration_seconds.toFixed(1)}s)
+                </span>
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-[#2e3e34] bg-[#1a2620] p-3">
+              <p className="text-[11px] text-slate-400 font-medium">
+                Pérdida por degradación
+              </p>
+              <p className="text-base font-semibold text-white mt-1">
+                ${displayEcon.estimated_degradation_cost.toFixed(2)}{' '}
+                <span className="text-xs text-slate-400 font-normal">
+                  ({displayEcon.degraded_duration_seconds.toFixed(1)}s)
+                </span>
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-[#2e3e34] bg-[#1a2620] p-3">
+              <p className="text-[11px] text-slate-400 font-medium">
+                Benchmark configurado
+              </p>
+              <p className="text-base font-semibold text-white mt-1">
+                ${displayEcon.cost_per_hour.toLocaleString()}{' '}
+                <span className="text-xs text-slate-400 font-normal">
+                  USD/hora
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowEconomicDetails((prev) => !prev)}
+            className="mt-3 flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+          >
+            <span>
+              {showEconomicDetails
+                ? 'Ocultar supuestos y fórmula'
+                : 'Ver supuestos y fórmula de cálculo'}
+            </span>
+            {showEconomicDetails ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {showEconomicDetails && (
+            <div className="mt-3 pt-3 border-t border-[#2e3e34] space-y-2">
+              <div className="rounded bg-[#121a16] p-2.5 font-mono text-[11px] text-slate-300 border border-[#24332b]">
+                <p className="text-emerald-400 font-semibold mb-1">Fórmula:</p>
+                <p className="break-all">{displayEcon.formula}</p>
+              </div>
+
+              {displayEcon.assumptions && displayEcon.assumptions.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Supuestos económicos:
+                  </p>
+                  <ul className="space-y-1 pl-1">
+                    {displayEcon.assumptions.map((assumption, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-1.5 text-xs text-slate-300"
+                      >
+                        <Info className="w-3.5 h-3.5 text-emerald-400/80 shrink-0 mt-0.5" />
+                        <span>{assumption}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
