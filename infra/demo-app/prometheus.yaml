@@ -43,14 +43,16 @@ metadata:
 data:
   prometheus.yml: |
     global:
-      scrape_interval: 15s
-      evaluation_interval: 15s
+      scrape_interval: 5s
+      evaluation_interval: 5s
 
     scrape_configs:
-      # ── Catalog-service pod discovery ──
-      # Discover each catalog-service pod independently instead of
-      # scraping the Kubernetes Service as a single target.
-      - job_name: catalog-service
+      # ── MyBookstore microservices pod discovery ──
+      # Discover each pod of every business microservice independently
+      # instead of scraping the Kubernetes Service as a single target.
+      # The `job` label is rewritten to the pod's `app` label so the Hypo
+      # backend can query every service as job="<service-name>".
+      - job_name: mybookstore-services
         metrics_path: /metrics
 
         kubernetes_sd_configs:
@@ -60,24 +62,27 @@ data:
                 - mybookstore
 
         relabel_configs:
-          # Keep only catalog-service pods.
+          # Keep only the six business microservices.
           - source_labels: [__meta_kubernetes_pod_label_app]
             action: keep
-            regex: catalog-service
+            regex: catalog-service|user-service|cart-service|order-service|review-service|wishlist-service
 
-          # Catalog exposes both HTTP (5001) and gRPC (50051).
-          # Only scrape the HTTP metrics endpoint.
+          # Services also expose gRPC ports (50051, 50052).
+          # Only scrape the HTTP ports 5001-5006 (regex is fully anchored).
           - source_labels: [__meta_kubernetes_pod_container_port_number]
             action: keep
-            regex: "5001"
+            regex: "500[1-6]"
 
           # Preserve the pod name as a Prometheus label so replicas
           # can be observed independently.
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
 
-          - target_label: service
-            replacement: catalog-service
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: service
+
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: job
 
       # ── Prometheus self-monitoring ──
       - job_name: prometheus

@@ -1,4 +1,5 @@
 import express from "express";
+import { installMetrics } from './metrics.js';
 import cors from "cors";
 import dotenv from "dotenv";
 import pool, { initDB } from "./db.js";
@@ -6,6 +7,7 @@ import pool, { initDB } from "./db.js";
 dotenv.config();
 
 const app = express();
+installMetrics(app);
 app.use(cors());
 app.use(express.json());
 
