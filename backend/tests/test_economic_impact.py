@@ -221,8 +221,6 @@ def test_format_economic_impact_summary_with_downtime():
     assert "Estimated financial impact: $60.00 USD" in summary
     assert "$60.00 downtime" in summary
     assert "$3,600.00/h" in summary
-
-
 def test_economic_impact_100_percent_pod_kill():
     """Killing 100% of replicas produces full downtime cost even if status is COMPLETED."""
     exp = make_experiment(duration_seconds=60, cost_per_hour=3600.0)
