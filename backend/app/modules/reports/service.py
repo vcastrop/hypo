@@ -81,7 +81,15 @@ def generate_findings_summary(
     # Calculate availability loss during chaos
     avail_loss: float | None = None
 
-    if before_metrics.success_rate is not None and during_metrics.success_rate is not None:
+    # Total replica termination guaranteed 100% loss during pod termination window
+    if (
+        experiment is not None
+        and experiment.failure_type == FailureType.POD_KILL
+        and experiment.target
+        and experiment.affected_replicas >= experiment.target.replicas
+    ):
+        avail_loss = 100.0
+    elif before_metrics.success_rate is not None and during_metrics.success_rate is not None:
         diff = before_metrics.success_rate - during_metrics.success_rate
         if diff > 0:
             avail_loss = round(diff, 2)

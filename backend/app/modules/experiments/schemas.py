@@ -92,6 +92,15 @@ class WindowMetrics(BaseModel):
     p95_latency_ms: float | None = None
 
 
+class PerformanceTimelinePoint(BaseModel):
+    time_offset_seconds: float
+    phase: Literal["before", "during", "after"]
+    latency_ms: float
+    error_rate: float
+    rps: float
+    active_replicas: int | None = None
+
+
 class Recommendation(BaseModel):
     id: str
     title: str
@@ -113,6 +122,7 @@ class ExperimentEvaluation(BaseModel):
     summary: str | None = None
     recommendations: list[Recommendation] = []
     economic_impact: EconomicImpact | None = None
+    performance_timeline: list[PerformanceTimelinePoint] = Field(default_factory=list)
 
 
 class ExperimentYamlResponse(BaseModel):
@@ -146,3 +156,4 @@ class ExperimentRunResult(BaseModel):
     summary: str | None = None
     recommendations: list[Recommendation] = []
     economic_impact: EconomicImpact | None = None
+    performance_timeline: list[PerformanceTimelinePoint] = Field(default_factory=list)

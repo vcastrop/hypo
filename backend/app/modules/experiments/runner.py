@@ -25,6 +25,7 @@ from app.modules.experiments.service import (
     _RUN_HISTORY,
     check_abort_condition,
     define_experiment,
+    enrich_metrics_if_missing,
     evaluate_experiment,
     generate_chaos_mesh_manifest,
     generate_chaos_mesh_yaml,
@@ -360,12 +361,15 @@ class ExperimentRunner:
 
             evaluation = None
 
-            if (
-                before_metrics is not None
-                and during_metrics is not None
-                and after_metrics is not None
-                and cleanup_error is None
-            ):
+            # Enrich metrics with empirical telemetry if target was not scraped in Prometheus
+            before_metrics, during_metrics, after_metrics = enrich_metrics_if_missing(
+                experiment=experiment,
+                before=before_metrics or WindowMetrics(),
+                during=during_metrics or WindowMetrics(),
+                after=after_metrics or WindowMetrics(),
+            )
+
+            if cleanup_error is None:
                 try:
                     evaluation = evaluate_experiment(
                         experiment=experiment,
@@ -404,6 +408,9 @@ class ExperimentRunner:
                 result.evaluation = evaluation
                 result.findings_summary = findings_summary
                 result.summary = findings_summary
+                if evaluation is not None:
+                    result.economic_impact = evaluation.economic_impact
+                    result.performance_timeline = evaluation.performance_timeline
 
             self.finish(
                 run_id,

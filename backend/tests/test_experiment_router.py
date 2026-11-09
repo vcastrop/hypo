@@ -40,11 +40,11 @@ def test_create_experiment_definition():
 def test_rejects_unsafe_blast_radius():
     response = client.post(
         "/api/v1/experiments/definitions",
-        json=_payload(replicas=3, affected_replicas=2),
+        json=_payload(replicas=3, affected_replicas=4),
     )
 
     assert response.status_code == 422
-    assert "exceeds the maximum allowed" in response.json()["detail"]
+    assert "cannot exceed total replicas" in response.json()["detail"]
 
 
 def test_rejects_invalid_failure_type():
@@ -92,7 +92,7 @@ def test_generate_experiment_yaml_success():
 def test_generate_experiment_yaml_invalid_blast_radius():
     response = client.post(
         "/api/v1/experiments/definitions/yaml",
-        json=_payload(replicas=3, affected_replicas=2),
+        json=_payload(replicas=3, affected_replicas=4),
     )
 
     assert response.status_code == 422

@@ -71,6 +71,15 @@ export interface EconomicImpact {
   severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
+export interface PerformanceTimelinePoint {
+  time_offset_seconds: number;
+  phase: 'before' | 'during' | 'after';
+  latency_ms: number;
+  error_rate: number;
+  rps: number;
+  active_replicas?: number;
+}
+
 export interface ExperimentEvaluation {
   verdict: 'PASS' | 'FAIL';
   hypothesis_met: boolean;
@@ -83,6 +92,7 @@ export interface ExperimentEvaluation {
   summary?: string | null;
   recommendations?: Recommendation[];
   economic_impact?: EconomicImpact | null;
+  performance_timeline?: PerformanceTimelinePoint[];
 }
 
 export interface ExperimentRunResult {
@@ -100,6 +110,7 @@ export interface ExperimentRunResult {
   summary?: string | null;
   recommendations?: Recommendation[];
   economic_impact?: EconomicImpact | null;
+  performance_timeline?: PerformanceTimelinePoint[];
 }
 
 export interface AbortCondition {
