@@ -1,4 +1,5 @@
 import express from 'express';
+import { installMetrics } from './metrics.js';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './db.js';
@@ -6,6 +7,7 @@ import Review from './Review.js';
 dotenv.config();
 
 const app = express();
+installMetrics(app);
 app.use(cors());
 app.use(express.json());
 

@@ -1,10 +1,12 @@
 import express from 'express';
+import { installMetrics } from './metrics.js';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import redis from './db.js';
 dotenv.config();
 
 const app = express();
+installMetrics(app);
 app.use(cors());
 app.use(express.json());
 

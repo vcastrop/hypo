@@ -1,4 +1,5 @@
 import express from "express";
+import { installMetrics } from './metrics.js';
 import cors from "cors";
 import dotenv from "dotenv";
 import pool, { initDB } from "./db.js";
@@ -10,6 +11,7 @@ const COMM_MODE = process.env.COMM_MODE || "rest";
 console.log(`Order service communication mode: ${COMM_MODE}`);
 
 const app = express();
+installMetrics(app);
 app.use(cors());
 app.use(express.json());
 
