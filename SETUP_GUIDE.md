@@ -28,7 +28,7 @@ This guide shows how to set up **Hypo** (the chaos‑engineering management plat
 ## 2. Clone the repository
 
 ```powershell
-git clone https://github.com/your-org/hypo.git
+git clone https://github.com/vcastrop/hypo.git
 cd hypo
 ```
 
