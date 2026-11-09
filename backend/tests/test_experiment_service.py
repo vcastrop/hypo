@@ -93,15 +93,28 @@ def test_defines_network_loss_experiment():
     assert "packet loss" in experiment.hypothesis
 
 
-def test_rejects_blast_radius_above_50_percent():
+def test_allows_100_percent_blast_radius():
     request = ExperimentDefinitionRequest(
         target=_target(replicas=3),
         failure_type=FailureType.POD_KILL,
         duration_seconds=60,
-        affected_replicas=2,
+        affected_replicas=3,
     )
 
-    with pytest.raises(ValueError, match="exceeds the maximum allowed"):
+    experiment = define_experiment(request)
+    assert experiment.blast_radius_percentage == 100.0
+    assert "total downtime" in experiment.hypothesis
+
+
+def test_rejects_blast_radius_above_100_percent():
+    request = ExperimentDefinitionRequest(
+        target=_target(replicas=3),
+        failure_type=FailureType.POD_KILL,
+        duration_seconds=60,
+        affected_replicas=4,
+    )
+
+    with pytest.raises(ValueError, match="cannot exceed total replicas"):
         define_experiment(request)
 
 

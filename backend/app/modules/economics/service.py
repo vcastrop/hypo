@@ -2,12 +2,15 @@
 
 Declares financial risk modeling for chaos experiment findings based on
 downtime, degradation windows, and configurable hourly cost benchmarks.
+Incorporates empirical research benchmarks from Amazon, Google, and Akamai
+for latency-induced abandonment and conversion drops, as well as Kubernetes
+pod-kill outage and endpoint reconvergence penalties.
 
 Complexity:
     - Time Complexity: O(1)
     - Space Complexity: O(1)
     - Data Structures: Float scalar math, deterministic rule mapping
-    - Algorithm Family: Proportional financial loss modeling
+    - Algorithm Family: Proportional financial loss modeling & empirical conversion analysis
 """
 
 from typing import Literal
@@ -16,10 +19,12 @@ from app.modules.economics.schemas import EconomicImpact
 from app.modules.experiments.schemas import (
     ExperimentDefinition,
     ExperimentStatus,
+    FailureType,
     WindowMetrics,
 )
 
 DEFAULT_COST_PER_HOUR = 1000.0
+ESTIMATED_AVERAGE_ORDER_VALUE = 30.0  # USD estimated order value for transactional conversion
 
 
 def calculate_economic_impact(
@@ -40,22 +45,36 @@ def calculate_economic_impact(
         Where:
             Downtime Cost = (downtime_seconds / 3600) * cost_per_hour
             Degradation Cost = (degraded_seconds / 3600) * cost_per_hour * degradation_factor
-            degradation_factor = min(1.0, (error_rate / 100) + latency_penalty)
+            degradation_factor = min(1.0, error_penalty + latency_penalty)
 
-    Assumptions:
+    Assumptions & Empirical Models:
         1. Hourly business cost (cost_per_hour) represents gross revenue loss,
            idle user/developer productivity, and SLA breach penalties.
-        2. Full downtime occurs when the service has an error rate >= 50%, or fails
-           completely during fault injection or abort.
+        2. Full downtime occurs when:
+           - The experiment is aborted or failed,
+           - Measured error rate >= 50%, or
+           - 100% of replicas are killed simultaneously in a pod-kill experiment.
         3. Recovery time contributes to downtime if the service was non-responsive
            until reconciliation finished.
-        4. Partial degradation (error rate < 50% or latency inflation > 100% of baseline)
-           causes proportional customer drop-off and conversion losses.
+        4. Latency degradation follows empirical e-commerce research:
+           - Amazon: ~1% revenue loss per 100ms inflation over baseline up to 1,000ms.
+           - Google / Akamai: 1,000ms-3,000ms inflation increases bounce and drop-off by 32%-53%.
+           - >3,000ms latency inflation causes critical abandonment (>90% drop-off / client timeouts).
+        5. Pod turnover: Partial replica termination causes transient socket drops during K8s
+           endpoint reconvergence (~3-5s), leading to failed in-flight client requests.
     """
     safe_cost_per_hour = max(0.0, float(cost_per_hour))
     duration_seconds = max(1.0, float(experiment.duration_seconds)) if experiment else 60.0
     target_name = experiment.target.name if experiment and experiment.target else "target-service"
     recovery_seconds = max(0.0, float(recovery_time_seconds or 0.0))
+
+    total_replicas = experiment.target.replicas if experiment and experiment.target else 1
+    affected_replicas = experiment.affected_replicas if experiment else 1
+    failure_type = experiment.failure_type if experiment else None
+
+    is_100_percent_blast = bool(
+        experiment and affected_replicas >= total_replicas
+    )
 
     before = before_metrics or WindowMetrics()
     during = during_metrics or WindowMetrics()
@@ -74,7 +93,10 @@ def calculate_economic_impact(
     elif during_err >= 50.0:
         # Massive disruption: Treated as full downtime during chaos + recovery
         downtime_seconds = duration_seconds + recovery_seconds
-    elif during_err > 1.0 or (before_p95 > 0 and during_p95 > (before_p95 * 1.5)):
+    elif is_100_percent_blast and failure_type == FailureType.POD_KILL:
+        # 100% of replicas terminated: complete outage during chaos + recovery
+        downtime_seconds = duration_seconds + recovery_seconds
+    elif during_err > 0.0 or (before_p95 > 0 and during_p95 > before_p95):
         # Partial degradation: Fault window is degraded, recovery counts if non-zero
         degraded_seconds = duration_seconds
         if recovery_seconds > 0:
@@ -88,9 +110,22 @@ def calculate_economic_impact(
 
     latency_penalty = 0.0
     if before_p95 > 0 and during_p95 > before_p95:
-        # Industry standard: ~1% revenue drop per 100ms inflation over baseline
-        latency_inflation_ms = during_p95 - before_p95
-        latency_penalty = min(0.5, (latency_inflation_ms / 100.0) * 0.01)
+        delta_lat = during_p95 - before_p95
+
+        # Tier 1 (0 to 1000ms): Amazon benchmark (1% drop per 100ms)
+        p1 = (min(1000.0, delta_lat) / 100.0) * 0.01
+
+        # Tier 2 (1000 to 3000ms): Google/Akamai benchmark (+32% to +53% bounce increase)
+        p2 = 0.0
+        if delta_lat > 1000.0:
+            p2 = ((min(3000.0, delta_lat) - 1000.0) / 2000.0) * 0.25
+
+        # Tier 3 (> 3000ms): Critical abandonment & HTTP client timeouts (>90% drop)
+        p3 = 0.0
+        if delta_lat > 3000.0:
+            p3 = min(0.65, ((delta_lat - 3000.0) / 2000.0) * 0.50)
+
+        latency_penalty = min(1.0, p1 + p2 + p3)
 
     degradation_factor = min(1.0, error_penalty + latency_penalty)
 
@@ -117,6 +152,7 @@ def calculate_economic_impact(
         "(Degraded Seconds / 3600 * Cost Per Hour * Degradation Factor)"
     )
 
+    # Estimate business metrics (lost sales & abandoned checkouts)
     assumptions = [
         f"Hourly cost benchmark is ${safe_cost_per_hour:,.2f}/h for {target_name}.",
         (
@@ -133,6 +169,28 @@ def calculate_economic_impact(
             else "No post-chaos recovery delay detected."
         ),
     ]
+
+    if is_100_percent_blast and failure_type == FailureType.POD_KILL:
+        assumptions.append(
+            f"100% blast radius applied ({affected_replicas} of {total_replicas} pods killed): "
+            "complete service outage registered during container recreation."
+        )
+
+    if latency_penalty > 0.0:
+        delta_lat = max(0.0, during_p95 - before_p95)
+        assumptions.append(
+            f"Latency inflation of +{delta_lat:.1f}ms applied via Google/Amazon empirical model "
+            f"(yields {latency_penalty * 100:.1f}% abandonment/conversion loss)."
+        )
+
+    if total_impact > 0.0:
+        estimated_lost_orders = round(total_impact / ESTIMATED_AVERAGE_ORDER_VALUE, 1)
+        estimated_abandoned_sessions = round(estimated_lost_orders / 0.5, 1)  # 50% checkout conversion
+        assumptions.append(
+            f"Estimated business impact: ~{estimated_lost_orders:.0f} lost orders "
+            f"(~{estimated_abandoned_sessions:.0f} abandoned checkout sessions at 50% purchase conversion, "
+            f"assuming ${ESTIMATED_AVERAGE_ORDER_VALUE:.2f} average ticket)."
+        )
 
     return EconomicImpact(
         currency="USD",

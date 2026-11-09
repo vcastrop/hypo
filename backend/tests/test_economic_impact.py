@@ -221,3 +221,44 @@ def test_format_economic_impact_summary_with_downtime():
     assert "Estimated financial impact: $60.00 USD" in summary
     assert "$60.00 downtime" in summary
     assert "$3,600.00/h" in summary
+
+
+def test_economic_impact_100_percent_pod_kill():
+    """Killing 100% of replicas produces full downtime cost even if status is COMPLETED."""
+    exp = make_experiment(duration_seconds=60, cost_per_hour=3600.0)
+    exp.affected_replicas = 2  # 2 of 2 = 100%
+    exp.target.replicas = 2
+
+    impact = calculate_economic_impact(
+        experiment=exp,
+        status=ExperimentStatus.COMPLETED,
+        recovery_time_seconds=30.0,
+        cost_per_hour=3600.0,
+    )
+
+    # 60s duration + 30s recovery = 90s downtime -> at $3600/hr = $90.00 USD
+    assert impact.downtime_duration_seconds == 90.0
+    assert impact.estimated_downtime_cost == 90.0
+    assert impact.total_estimated_impact == 90.0
+    assert impact.severity in ("high", "critical")
+    assert any("100% blast radius" in a for a in impact.assumptions)
+    assert any("lost orders" in a for a in impact.assumptions)
+
+
+def test_economic_impact_latency_google_amazon_model():
+    """Latency inflation applies empirical Google/Amazon model with order impact estimation."""
+    exp = make_experiment(duration_seconds=60, cost_per_hour=3600.0)
+    impact = calculate_economic_impact(
+        experiment=exp,
+        status=ExperimentStatus.COMPLETED,
+        before_metrics=WindowMetrics(p95_latency_ms=40.0),
+        during_metrics=WindowMetrics(p95_latency_ms=1500.0),  # +1460ms inflation
+        after_metrics=WindowMetrics(p95_latency_ms=40.0),
+        cost_per_hour=3600.0,
+    )
+
+    # delta = 1460ms -> tier 1 (10%) + tier 2 (460/2000 * 25% = 5.75%) -> ~15.75%
+    assert impact.degraded_duration_seconds == 60.0
+    assert impact.total_estimated_impact > 5.0
+    assert any("Latency inflation" in a for a in impact.assumptions)
+    assert any("lost orders" in a for a in impact.assumptions)
