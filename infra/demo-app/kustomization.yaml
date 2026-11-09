@@ -1,0 +1,21 @@
+﻿apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - mongodb.yaml
+  - redis.yaml
+  - postgres-user.yaml
+  - postgres-order.yaml
+  - catalog-service.yaml
+  - user-service.yaml
+  - review-service.yaml
+  - wishlist-service.yaml
+  - cart-service.yaml
+  - order-service.yaml
+  - api-gateway-config.yaml
+  - api-gateway.yaml
+  - frontend.yaml
+  - prometheus.yaml
+  - grafana-dashboard-configmap.yaml
+  - grafana.yaml

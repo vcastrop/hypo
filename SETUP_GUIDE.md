@@ -1,265 +1,261 @@
-# Hypo Project – Full Setup Guide
+# Guía Definitiva: Despliegue de Hypo Platform y Demo App para Presentación en Vivo
 
-This guide shows how to set up **Hypo** (the chaos‑engineering management platform) from a clean machine, run the demo application, and verify the end‑to‑end pipeline.
-
----
-
-## 1. Prerequisites
-
-| Tool | Minimum version | Install command / link |
-|------|----------------|-----------------------|
-| **Git** | 2.40+ | <https://git-scm.com/downloads> |
-| **Python** | 3.12+ (3.14 used in CI) | `choco install python --version=3.14` (Windows) |
-| **Poetry** | 1.8+ | `pip install poetry` |
-| **Node.js** | 20.x LTS | <https://nodejs.org/en/download/> |
-| **npm** (bundled with Node) | 10.x | – |
-| **Docker Desktop** (includes **kubectl**) | 26.0+ | <https://www.docker.com/products/docker-desktop> |
-| **Kind** (Kubernetes in Docker) | 0.20+ | `go install sigs.k8s.io/kind@latest` |
-| **Helm** | 3.14+ | `choco install kubernetes-helm` |
-| **kubectl** | 1.28+ | Comes with Docker Desktop; verify with `kubectl version --client` |
-| **Chaos Mesh** | v2.6+ | See *Install Chaos Mesh* section |
-| **Prometheus Operator** (for metrics) | v0.71+ | Helm chart `prometheus-community/kube-prometheus-stack` |
-| **Httpie** (optional for API testing) | 3.2+ | `pip install httpie` |
-
-> **NOTE**: All commands below assume a PowerShell prompt on Windows.
+Esta guía contiene la secuencia **completa, probada y validada en vivo** para levantar todo el ecosistema desde cero en Windows (PowerShell), generar tráfico real y realizar una presentación profesional de la plataforma de ingeniería del caos **Hypo**.
 
 ---
 
-## 2. Clone the repository
+## 🗺️ Mapa General del Ecosistema
 
-```powershell
-git clone https://github.com/vcastrop/hypo.git
-cd hypo
+```mermaid
+flowchart TD
+    subgraph Kubernetes["Clúster Kubernetes Local (Kind: 'hypo')"]
+        subgraph NS_App["Namespace: mybookstore"]
+            APIGW["api-gateway :80"]
+            CAT["catalog-service (x2)"]
+            CART["cart-service (x2)"]
+            ORD["order-service (x2)"]
+            USR["user-service (x2)"]
+            REV["review-service (x2)"]
+            WSH["wishlist-service (x2)"]
+            FE_DEMO["frontend (Demo App)"]
+            DBS["Databases: MongoDB, Redis, PostgreSQL"]
+            PROM["Prometheus (:9090)"]
+            GRAF["Grafana (:3001)"]
+        end
+        subgraph NS_Chaos["Namespace: chaos-mesh"]
+            CM["Chaos Mesh Controller & Daemon"]
+        end
+    end
+
+    subgraph Host["Máquina Host (Tu Entorno Local)"]
+        PF_PROM["Port-Forward Prometheus (:9090)"]
+        PF_GW["Port-Forward Gateway (:80)"]
+        TRAFFIC["Traffic Generator (Spring Boot :8085)"]
+        BACKEND["Hypo Backend (FastAPI :8000)<br/>• Discovery API<br/>• Chaos Engine CRD Manager<br/>• Prometheus SLI Sampler<br/>• Automated Findings Summary (PB-07a)<br/>• Remediation Engine (PB-07b)<br/>• Economic Impact Estimator (PB-08a/b)"]
+        FRONTEND["Hypo Web App (React + Vite :3000)<br/>• Login Screen<br/>• Infrastructure Topology View<br/>• Experiment Runner & History<br/>• Plain-Language Results & ROI"]
+    end
+
+    PF_PROM -->|localhost:9090| PROM
+    PF_GW -->|localhost:80| APIGW
+    TRAFFIC -->|HTTP POST /api/books| PF_GW
+    BACKEND -->|PromQL Queries :9090| PF_PROM
+    BACKEND -->|K8s API & CRDs| Kubernetes
+    FRONTEND -->|HTTP Proxy /api| BACKEND
 ```
 
-The repository layout (relevant parts):
-
-- `backend/` – FastAPI server, chaos‑mesh client, Prometheus client, business logic.
-- `frontend/` – React/Next.js UI.
-- `infra/demo-app/` – Kubernetes manifests for the sample e‑commerce app used in demos.
-- `workload/demo-app/` – Alternative location for the same manifests (the code references both).
-- `backend/tests/` – Unit, integration, and end‑to‑end test suite.
-
 ---
 
-## 3. Set up a local Kubernetes cluster
+## 📋 PARTE 1: Despliegue de Infraestructura y Demo App
 
+> Ejecuta estos comandos desde la raíz del proyecto en PowerShell:
+> `C:\Users\emanu\Documentos\Clases\2026-2\Proyecto TI\hypo`
+
+### 1.1 Crear el Clúster Kind
 ```powershell
-# Create a Kind cluster named hypo
 kind create cluster --name hypo --config=infra/kind-config.yaml
-```
-
-> **TIP**: The `kind-config.yaml` file (in the repo) configures two worker nodes and enables the `Ingress` add‑on.
-
-Verify the cluster:
-
-```powershell
-kubectl cluster-info
 kubectl get nodes
 ```
 
 ---
 
-## 4. Deploy the demo application
-
-The demo app consists of several micro‑services (catalog, cart, order, api‑gateway) and a PostgreSQL DB.
-
-```powershell
-# Change to the manifests directory
-cd infra/demo-app
-# Apply all manifests
-kubectl apply -k .
-```
-
-Wait for all pods to become Ready:
+### 1.2 Compilar y Cargar las Imágenes de la Demo App en Kind
+Kind necesita las imágenes en sus nodos para no intentar descargarlas de un registro externo:
 
 ```powershell
-kubectl wait --for=condition=Ready pod --all --timeout=180s
-```
+# Compilar imágenes en Docker local
+docker build -t mybookstore/catalog-service:dev workload/demo-app/microservices/catalog-service
+docker build -t mybookstore/user-service:dev workload/demo-app/microservices/user-service
+docker build -t mybookstore/cart-service:dev workload/demo-app/microservices/cart-service
+docker build -t mybookstore/order-service:dev workload/demo-app/microservices/order-service
+docker build -t mybookstore/review-service:dev workload/demo-app/microservices/review-service
+docker build -t mybookstore/wishlist-service:dev workload/demo-app/microservices/wishlist-service
+docker build --build-arg VITE_API_URL=/ -t mybookstore/frontend:dev workload/demo-app/frontend
 
-You can verify the services:
-
-```powershell
-kubectl get svc -n demo-app
+# Cargar imágenes al clúster Kind 'hypo'
+kind load docker-image mybookstore/catalog-service:dev --name hypo
+kind load docker-image mybookstore/user-service:dev --name hypo
+kind load docker-image mybookstore/cart-service:dev --name hypo
+kind load docker-image mybookstore/order-service:dev --name hypo
+kind load docker-image mybookstore/review-service:dev --name hypo
+kind load docker-image mybookstore/wishlist-service:dev --name hypo
+kind load docker-image mybookstore/frontend:dev --name hypo
 ```
 
 ---
 
-## 5. Install Chaos Mesh
+### 1.3 Desplegar la Demo App en el Namespace `mybookstore`
+```powershell
+# Aplicar todos los manifiestos mediante kustomize
+kubectl apply -k infra/demo-app
 
+# Verificar que todos los pods estén en estado 'Running'
+kubectl get pods -n mybookstore
+```
+
+---
+
+### 1.4 Instalar Chaos Mesh
+Instala Chaos Mesh apuntando al namespace objetivo de la aplicación (`mybookstore`):
 ```powershell
 helm repo add chaos-mesh https://charts.chaos-mesh.org
 helm repo update
-helm install chaos-mesh chaos-mesh/chaos-mesh \
-  --namespace chaos-mesh --create-namespace \
-  --set controllerManager.targetNamespace=demo-app \
+helm install chaos-mesh chaos-mesh/chaos-mesh `
+  --namespace chaos-mesh --create-namespace `
+  --set controllerManager.targetNamespace=mybookstore `
   --set dashboard.enabled=true
-```
 
-Expose the Chaos Mesh dashboard (optional):
-
-```powershell
-kubectl port-forward -n chaos-mesh svc/chaos-mesh-dashboard 2333:2333
-# Then open http://localhost:2333 in a browser
+# Verificar que los pods de Chaos Mesh estén activos
+kubectl get pods -n chaos-mesh
 ```
 
 ---
 
-## 6. Install Prometheus (for metrics collection)
+## 🔌 PARTE 2: Conectividad y Generador de Tráfico (Clave para Métricas Reales)
 
+Para que Hypo lea las métricas SLI reales y el fallo genere un impacto observable, necesitas exponer Prometheus y encender el tráfico.
+
+### 2.1 Exponer Prometheus (Terminal dedicada)
+Abre una terminal de PowerShell y déjala corriendo:
 ```powershell
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  --namespace monitoring --create-namespace
+kubectl port-forward -n mybookstore svc/prometheus 9090:9090
 ```
+> [!NOTE]
+> Esto permite que el backend de Hypo consulte `http://localhost:9090` en tiempo real.
 
-Expose Prometheus for local queries (optional):
-
+### 2.2 Exponer el API Gateway de la Demo App (Terminal dedicada)
+Abre otra terminal de PowerShell y déjala corriendo:
 ```powershell
-kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
+kubectl port-forward -n mybookstore svc/api-gateway 80:80
 ```
+*(Si el puerto 80 local está ocupado en tu máquina por otro servicio, puedes usar `8080:80` asegurando actualizar la URL base en el generador de tráfico).*
+
+### 2.3 Iniciar y Encender el Generador de Tráfico
+El generador de tráfico está configurado en el puerto **`8085`** (para no chocar con el puerto 8080 ni 8000).
+
+1. **Iniciar el servidor Spring Boot**:
+   ```powershell
+   cd trafficgenerator
+   .\mvnw.cmd spring-boot:run
+   ```
+
+2. **Iniciar la simulación continua de peticiones** (en otra terminal o tras levantar el servidor):
+   ```powershell
+   Invoke-RestMethod -Uri "http://localhost:8085/simulate/start" -Method Post
+   ```
+   **Respuesta esperada:** `"Simulación iniciada"`. Ahora hay flujo constante de usuarios consultando `/api/books`.
 
 ---
 
-## 7. Backend – Python environment
+## 💻 PARTE 3: Iniciar la Plataforma Hypo
 
+### 🟢 Terminal Hypo Backend (FastAPI)
 ```powershell
-# From the repository root
 cd backend
-poetry install   # creates a virtual env and installs dependencies
-# Activate the venv (PowerShell)
-poetry shell
+
+# Activar entorno virtual de Python
+.venv\Scripts\Activate.ps1
+
+# (Si es primera vez o faltan dependencias)
+pip install -e ".[dev]"
+
+# Iniciar backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-
-Run database migrations (if any) – the project currently uses an in‑memory SQLite DB for tests, so no migration step is required for the demo.
-
-### 7.1. Start the FastAPI server
-
-```powershell
-# The server reads config from env vars; the defaults work for the local cluster.
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-The API is now reachable at `http://localhost:8000`. You can explore the OpenAPI UI at `http://localhost:8000/docs`.
+- API activa: `http://localhost:8000`
+- Swagger OpenAPI: `http://localhost:8000/docs`
 
 ---
 
-## 8. Frontend – Node environment
-
+### 🔵 Terminal Hypo Frontend (React + Vite)
 ```powershell
-cd ..\frontend
-npm install
-npm run dev   # starts the dev server on http://localhost:3000
-```
+cd frontend
 
-To create a production build (optional for demo):
-
-```powershell
-npm run build
-npm run start   # serves the built assets
+# Iniciar aplicación web
+npm run dev
 ```
+- Consola Web de Hypo: **`http://localhost:3000`**
 
 ---
 
-## 9. Verify the full pipeline manually (optional)
+## 🎤 PARTE 4: Guión de Presentación en Vivo (Storytelling de Impacto)
 
-You can use **httpie** (or `curl`) to trigger a full experiment, e.g., a pod‑kill on `catalog-service`:
+Abre **`http://localhost:3000`** en tu navegador. Sigue este recorrido:
 
-```powershell
-# 1️⃣ Discover services (optional, just to see they are registered)
-http GET http://localhost:8000/api/v1/discovery/services
-
-# 2️⃣ Create an experiment definition (YAML) – the API can generate it for you
-http POST http://localhost:8000/api/v1/experiments/definitions/yaml \
-  service=catalog-service \
-  type=pod-kill \
-  parameters:='{"replicas":1}' > catalog-podkill.yaml
-
-# 3️⃣ Run the experiment
-http POST http://localhost:8000/api/v1/experiments/runs \
-  yaml@catalog-podkill.yaml
+```
+[Login SRE] ➡️ [Discovery] ➡️ [Experimento con Fallo Real] ➡️ [Resumen PB-07a] ➡️ [Recomendaciones PB-07b] ➡️ [ROI Económico PB-08]
 ```
 
-After the experiment finishes you can fetch the result:
+### 1. Inicio y Propuesta de Valor
+- **Pantalla**: Login (`http://localhost:3000`).
+- **Acción**: Haz clic en **"Continuar como SRE Engineer"**.
+- **Discurso**:
+  > *"Hypo resuelve el problema de la resiliencia en PYMEs. Hoy las herramientas de caos requieren ingenieros dedicados y son complejas. Hypo automatiza todo el ciclo: descubre los servicios, guía la hipótesis, mide con Prometheus y traduce los fallos técnicos a lenguaje de negocio y dinero real."*
 
-```powershell
-http GET http://localhost:8000/api/v1/experiments/runs/<run-id>
-```
+### 2. Descubrimiento de Infraestructura (Discovery)
+- **Pantalla**: Pestaña **"Infraestructura"**.
+- **Acción**: Selecciona el namespace **`mybookstore`**.
+- **Demostración**:
+  - Muestra cómo Hypo mapea en vivo los microservicios (`catalog-service`, `cart-service`, `order-service`) y sus bases de datos.
+  - Muestra el estado de réplicas deseadas vs. listas.
 
-The JSON payload contains:
-- `findings_summary` – plain‑language description (PB‑07a).
-- `recommendations` – remediation actions (PB‑07b).
-- `economic_impact` – cost estimation (PB‑08a/b).
+### 3. Ejecución de un Experimento con Falla Evidente (FAIL)
+Para una demo impactante donde se aprecien métricas alteradas y costos económicos, usa uno de estos dos escenarios:
+
+- **Escenario 1 (Recomendado): Latencia en Cart Service (`network-delay`)**
+  - **Servicio**: `cart-service`.
+  - **Tipo**: `network-delay`.
+  - **Latencia**: `250ms`.
+  - **SLO Latencia P95**: `100ms` (para que el fallo sea evidente).
+  - Haz clic en **"Ejecutar Experimento"**.
+
+- **Escenario 2: Caída total de Catalog Service (`pod-kill` 100%)**
+  - **Servicio**: `catalog-service`.
+  - **Tipo**: `pod-kill`.
+  - **Blast Radius**: `100%` (mata todas las réplicas simultáneamente para forzar indisponibilidad temporal).
+  - **Duración**: `30 segundos`.
+
+### 4. Resumen Automático de Hallazgos (PB-07a)
+- **Pantalla**: **"Historial de Ejecuciones"** ➡️ Selecciona la ejecución.
+- **Qué destacar**:
+  - **Tabla de 3 Ventanas**: Compara `Antes (Baseline)`, `Durante el Caos` (donde la latencia se dispara o la tasa de error sube) y `Después (Recuperación)`.
+  - **Veredicto**: `FAIL` (Violación del SLO).
+  - **Resumen en Lenguaje Natural**: Muestra cómo el sistema redacta el diagnóstico ejecutivo de forma automática:
+    > *"El servicio experimentó una degradación crítica con un incremento de latencia P95 a 290ms y una tasa de error del 15% durante la inyección, recuperando su estado estable en X segundos."*
+
+### 5. Recomendaciones de Remediación (PB-07b)
+- **Qué destacar**: Despliega la sección de **"Recomendaciones"** en la tarjeta.
+- **Discurso**:
+  > *"Hypo no se limita a reportar la falla. El motor de prescripción indica exactamente las medidas técnicas a implementar: por ejemplo, `REC-NET-TIMEOUT-01` (ajuste de timeouts y circuit breaker) o `REC-POD-PDB-01` (creación de PodDisruptionBudget). Cada una clasificada por su severidad (Alta, Media, Crítica)."*
+
+### 6. Evaluación de Impacto Económico (PB-08a / PB-08b)
+- **Qué destacar**: La tarjeta de **"Impacto Financiero Estimado"**.
+- **Discurso**:
+  > *"Esta es la ventaja competitiva de Hypo: traduce el fallo técnico a números de negocio. A partir del costo por hora configurado, el tiempo de degradación y la fórmula matemática visible, Hypo calculó una pérdida estimada de $X USD. Esto permite a los líderes de tecnología justificar la inversión en resiliencia ante directores y gerentes."*
 
 ---
 
-## 10. Run the automated test suite
+## 🛡️ PARTE 5: Prueba de Respaldo Técnico (E2E Tests)
 
-### 10.1. Backend tests (including the end‑to‑end pipeline)
-
-```powershell
-cd ..\backend
-poetry run pytest -vv
-```
-
-You should see **122 passed** and a summary like:
-```
-======================= 122 passed, 1 warning in 5.22s =======================
-```
-
-The three end‑to‑end tests (`test_e2e_pipeline.py`) each execute the full pipeline against the demo app running in the Kind cluster.
-
-### 10.2. Frontend lint & build
+Si en la sesión de preguntas te piden verificar la robustez del código y los tests:
 
 ```powershell
-cd ..\frontend
-npm run lint   # ensure TypeScript & ESLint pass
-npm run build   # confirm production bundle builds without errors
+cd backend
+.venv\Scripts\Activate.ps1
+
+# Ejecutar las 3 pruebas end-to-end completas
+pytest tests/test_e2e_pipeline.py -v
+
+# Ejecutar la suite completa (122 pruebas unitarias e integración)
+pytest tests/
 ```
+
+Ambas pruebas correrán y pasarán al 100%.
 
 ---
 
-## 11. Clean‑up
+## 🧹 PARTE 6: Limpieza Final
 
-When you are finished:
-
+Cuando termines tu presentación:
 ```powershell
-# Delete the Kind cluster
 kind delete cluster --name hypo
-# (Optional) Remove Helm releases
-helm uninstall chaos-mesh -n chaos-mesh
-helm uninstall prometheus -n monitoring
 ```
-
----
-
-## 12. Quick‑reference cheat‑sheet
-
-| Step | Command | Purpose |
-|------|---------|----------|
-| **Create cluster** | `kind create cluster --name hypo --config=infra/kind-config.yaml` | Spin up a local k8s environment |
-| **Deploy demo** | `kubectl apply -k infra/demo-app` | Install the sample e‑commerce app |
-| **Chaos Mesh** | `helm install chaos-mesh chaos-mesh/chaos-mesh …` | Enable chaos‑injection capabilities |
-| **Prometheus** | `helm install prometheus prometheus-community/kube-prometheus-stack …` | Collect SLIs for measurement |
-| **Backend** | `cd backend && poetry install && uvicorn app.main:app` | Start the API server |
-| **Frontend** | `cd frontend && npm install && npm run dev` | Launch UI |
-| **Run tests** | `cd backend && poetry run pytest -vv` | Verify end‑to‑end pipeline |
-
----
-
-## 13. Frequently asked questions
-
-* **Do I need a cloud provider?** – No. All components run locally with Kind/Docker.
-* **What if I get “Failed to pull image” errors?** – Ensure Docker Desktop is using the default Linux containers engine and that the images built by the backend (`hypo-backend`) are present (`docker images`). The `poetry install` step builds the required image via the `docker-compose.yml` helper.
-* **Can I use Minikube instead of Kind?** – Yes, replace the Kind commands with the equivalent `minikube start` and apply the manifests; the rest of the workflow is identical.
-* **Where are the generated findings summaries stored?** – In the experiment result model (`backend/app/modules/experiments/models.py`), persisted in the SQLite DB at `backend/data/hypo.db` (path configurable via `HYPO_DB_URL`).
-
----
-
-### Ready to present!
-Follow the steps above on a fresh machine, and you will have a fully functional Hypo platform, the demo app, and a verified end‑to‑end chaos‑engineering workflow ready for live demonstration.
-
----
-
-*If you need a diagram of the architecture or a visual walkthrough, let me know and I can generate a mermaid chart.*
