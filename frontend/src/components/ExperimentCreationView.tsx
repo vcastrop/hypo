@@ -158,76 +158,122 @@ export const ExperimentCreationView: React.FC = () => {
     Number.isFinite(costPerHour) &&
     costPerHour > 0;
 
-  // Generación de fallas recomendadas según la arquitectura de microservicios descubierta
+  // Motor adaptativo de recomendaciones basado en la topología real descubierta en Kubernetes
+  // Complejidad: O(W) tiempo y O(W) espacio sobre los workloads descubiertos.
   const getArchitectureRecommendations = (): ArchitectureRecommendation[] => {
+    const observabilityNames = /^(prometheus|grafana|jaeger|zipkin|otel|kiali|loki)$/i;
+    const candidates = workloads.filter((w) => !observabilityNames.test(w.name));
     const list: ArchitectureRecommendation[] = [];
 
-    const hasCart = workloads.some((w) => w.name === 'cart-service');
-    const hasOrder = workloads.some((w) => w.name === 'order-service');
-    const hasCatalog = workloads.some((w) => w.name === 'catalog-service');
-    const hasGateway = workloads.some((w) => w.name === 'api-gateway');
+    for (const w of candidates) {
+      const lower = w.name.toLowerCase();
+      const labelStr = Object.entries(w.labels ?? {})
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ');
+      const halfReplicas = Math.max(1, Math.floor(w.replicas / 2));
 
-    if (hasCart) {
+      // 1. Perímetro / Gateway / Proxy / Ingress
+      if (/(gateway|ingress|proxy|nginx|envoy|router|edge|bff)/.test(lower)) {
+        list.push({
+          id: `rec-gw-${w.name}`,
+          targetName: w.name,
+          failureType: 'network-loss',
+          duration: 30,
+          affectedReplicas: halfReplicas,
+          title: `Pérdida de Paquetes en Perímetro (${w.name})`,
+          architecturalReason: `${w.kind} de entrada con ${w.replicas} réplica(s) [${labelStr || 'app=' + w.name}]. Comprueba si la pérdida parcial de paquetes satura los reintentos TCP entre el cliente y los servicios internos.`,
+          expectedRisk: 'Respuestas 502/504 en cascada si no hay circuit-breaking ni timeouts cortos.',
+          tag: 'Perímetro & Red',
+        });
+        continue;
+      }
+
+      // 2. Flujo Transaccional / Pagos / Pedidos / Checkout
+      if (/(order|pay|checkout|billing|invoice|transaction|purchase|booking)/.test(lower)) {
+        list.push({
+          id: `rec-tx-${w.name}`,
+          targetName: w.name,
+          failureType: 'network-delay',
+          duration: 30,
+          affectedReplicas: w.replicas,
+          title: `Latencia Crítica en Flujo Transaccional (${w.name})`,
+          architecturalReason: `${w.kind} transaccional con ${w.replicas} réplica(s). Inyectar latencia en el 100% de sus pods mide la tolerancia de timeouts río arriba y la tasa real de abandono de compra.`,
+          expectedRisk: 'Abandono acelerado de sesiones de pago (>20% pérdida de conversión).',
+          tag: 'Financiero & SLA',
+        });
+        continue;
+      }
+
+      // 3. Estado de Sesión / Carrito / Autenticación
+      if (/(cart|session|auth|login|token|basket|user)/.test(lower)) {
+        list.push({
+          id: `rec-session-${w.name}`,
+          targetName: w.name,
+          failureType: 'pod-kill',
+          duration: 30,
+          affectedReplicas: halfReplicas,
+          title: `Reconvergencia de Balanceador en Servicio de Sesión (${w.name})`,
+          architecturalReason: `${w.kind} con ${w.replicas} réplica(s) activas. Matar ${halfReplicas}/${w.replicas} pod(s) evalúa cuántos segundos tarda kube-proxy en drenar conexiones sin perder sesiones en vuelo.`,
+          expectedRisk: 'Peticiones 502 durante la ventana de reconvergencia (~5s) o pérdida de estado.',
+          tag: 'Alta Disponibilidad',
+        });
+        continue;
+      }
+
+      // 4. Punto Único de Falla (SPOF): cualquier workload con 1 sola réplica (bases de datos o servicios sin redundancia)
+      if (w.replicas === 1) {
+        const isDb = /(postgres|mongo|mysql|mariadb|redis|elastic|opensearch|db|database|cache|kafka|rabbit)/.test(lower);
+        list.push({
+          id: `rec-spof-${w.name}`,
+          targetName: w.name,
+          failureType: isDb ? 'network-delay' : 'pod-kill',
+          duration: 30,
+          affectedReplicas: 1,
+          title: isDb
+            ? `Degradación de Dependencia de Datos SPOF (${w.name})`
+            : `Punto Único de Falla Sin Redundancia (${w.name})`,
+          architecturalReason: `${w.kind} detectado con solo 1 réplica (0% redundancia). ${
+            isDb
+              ? 'Al ser instancia única de datos, una latencia de red impacta a todos los microservicios dependientes.'
+              : 'Terminar su único pod causará caída total hasta que Kubernetes reprograme el contenedor.'
+          }`,
+          expectedRisk: 'Interrupción del 100% del componente por falta de réplicas de respaldo.',
+          tag: 'SPOF (1 Réplica)',
+        });
+        continue;
+      }
+
+      // 5. Servicios de Lectura / Catálogo / Búsqueda / Contenido o cualquier otro multi-réplica genérico
+      if (/(catalog|search|product|inventory|feed|review|wishlist|content)/.test(lower)) {
+        list.push({
+          id: `rec-stress-${w.name}`,
+          targetName: w.name,
+          failureType: 'resource-stress',
+          duration: 30,
+          affectedReplicas: halfReplicas,
+          title: `Saturación de CPU/Memoria en Servicio de Lectura (${w.name})`,
+          architecturalReason: `${w.kind} con ${w.replicas} réplicas. Someter ${halfReplicas} pod(s) a estrés de CPU/RAM valida si el balanceador reparte la carga sin degradar el percentil P95 global.`,
+          expectedRisk: 'Throttling de CPU y aumento del tiempo de respuesta P95.',
+          tag: 'Capacidad & Tráfico',
+        });
+        continue;
+      }
+
+      // 6. Regla genérica adaptativa para cualquier otro workload arbitrario del cluster
       list.push({
-        id: 'rec-cart-kill',
-        targetName: 'cart-service',
-        failureType: 'pod-kill',
+        id: `rec-generic-${w.name}`,
+        targetName: w.name,
+        failureType: w.replicas >= 2 ? 'pod-kill' : 'network-delay',
         duration: 30,
-        affectedReplicas: 1,
-        title: 'Reconvergencia de Balanceo en Carrito (cart-service)',
-        architecturalReason:
-          'Servicio de estado de sesión con 2 réplicas conectadas a Redis. Evalúa si el Load Balancer descarta compras durante la desconexión del pod.',
-        expectedRisk: 'Riesgo de carritos vaciados o pérdida de items en vuelo.',
-        tag: 'Checkout Crítico',
+        affectedReplicas: halfReplicas,
+        title: `Prueba de Resiliencia de Réplicas (${w.name})`,
+        architecturalReason: `${w.kind} descubierto en el namespace "${w.namespace}" con ${w.replicas} réplica(s) listas [${labelStr || 'sin labels'}]. Evalúa la tolerancia a fallos y el tiempo de recuperación automática.`,
+        expectedRisk: `Degradación parcial (${Math.round((halfReplicas / w.replicas) * 100)}% blast radius) durante el reemplazo de pods.`,
+        tag: `${w.kind} (${w.replicas} pods)`,
       });
     }
 
-    if (hasOrder) {
-      list.push({
-        id: 'rec-order-delay',
-        targetName: 'order-service',
-        failureType: 'network-delay',
-        duration: 30,
-        affectedReplicas: 2,
-        title: 'Latencia Extrema en Pasarela y Pagos (order-service)',
-        architecturalReason:
-          'Procesa transacciones conectado a postgres-order (instancia única). Evalúa la tolerancia a timeouts y abandono de checkout.',
-        expectedRisk: 'Abandono de compra acelerado (>20% pérdida de ventas).',
-        tag: 'Financiero & SLA',
-      });
-    }
-
-    if (hasCatalog) {
-      list.push({
-        id: 'rec-catalog-stress',
-        targetName: 'catalog-service',
-        failureType: 'resource-stress',
-        duration: 30,
-        affectedReplicas: 1,
-        title: 'Saturación de CPU en Catálogo de Libros (catalog-service)',
-        architecturalReason:
-          'Microservicio con el 80% de las lecturas hacia MongoDB. Valida si la sobrecarga de un pod degrada la experiencia general de navegación.',
-        expectedRisk: 'Lentitud percibida y aumento del tiempo de respuesta P95.',
-        tag: 'Capacidad & Tráfico',
-      });
-    }
-
-    if (hasGateway) {
-      list.push({
-        id: 'rec-gateway-loss',
-        targetName: 'api-gateway',
-        failureType: 'network-loss',
-        duration: 30,
-        affectedReplicas: 1,
-        title: 'Pérdida de Paquetes en Ingress Gateway (api-gateway)',
-        architecturalReason:
-          'Punto de entrada único para el frontend. Comprueba si los reintentos TCP saturan los sockets de clientes móviles y web.',
-        expectedRisk: 'Respuestas 502/504 en cascada hacia el usuario.',
-        tag: 'Perímetro',
-      });
-    }
-
-    return list;
+    return list.slice(0, 6);
   };
 
   const applyRecommendation = (rec: ArchitectureRecommendation) => {
